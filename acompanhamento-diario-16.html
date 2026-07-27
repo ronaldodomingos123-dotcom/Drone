@@ -1,0 +1,2775 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Acompanhamento Diário — Aplicação com Drone</title>
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0e5a6d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Acompanhamento">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="icon" type="image/png" href="./icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS
+============================================================ */
+:root{
+  /* Paleta institucional */
+  --petroleo:#0e5a6d;
+  --petroleo-esc:#0a3d4a;
+  --azul-esc:#27327e;
+  --roxo:#6d28d9;
+  --roxo-vivo:#7c5cfc;
+  --verde:#0d9463;
+  --verde-esc:#047857;
+  --laranja:#ea580c;            /* apenas destaque */
+
+  /* Neutros */
+  --tinta:#13253a;
+  --texto-2:#5f6f80;
+  --fundo:#f4f6fa;
+  --card:#ffffff;
+  --linha:#e6eaf1;
+  --campo-hover:#f1f4f9;
+
+  /* Superfícies tintadas */
+  --tint-roxo:#f0ecfd;
+  --tint-petroleo:#e4f1f4;
+  --tint-verde:#e3f6ee;
+  --tint-laranja:#fdeee2;
+  --tint-azul:#e8ecfb;
+
+  /* Forma e movimento */
+  --raio:20px;
+  --raio-int:14px;
+  --sombra:0 4px 18px rgba(19,37,58,.06);
+  --sombra-hover:0 12px 30px rgba(19,37,58,.12);
+  --t:250ms;
+}
+
+*{box-sizing:border-box; margin:0; padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  background:var(--fundo); color:var(--tinta);
+  padding-bottom:48px;
+  -webkit-font-smoothing:antialiased;
+}
+svg{display:block;}
+.un{font-size:.85rem; font-weight:600; color:var(--texto-2);}
+
+/* ============================================================
+   ANIMAÇÕES
+============================================================ */
+@keyframes surgir{
+  from{opacity:0; transform:translateY(16px);}
+  to{opacity:1; transform:translateY(0);}
+}
+.anim{animation:surgir .55s cubic-bezier(.22,.8,.35,1) both;}
+.anim.d1{animation-delay:.05s} .anim.d2{animation-delay:.12s}
+.anim.d3{animation-delay:.19s} .anim.d4{animation-delay:.26s}
+.anim.d5{animation-delay:.33s}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{animation:none !important; transition:none !important;}
+}
+
+/* ============================================================
+   CABEÇALHO
+============================================================ */
+.topo{
+  background:
+    radial-gradient(900px 420px at 88% -10%, rgba(124,92,252,.45), transparent 60%),
+    radial-gradient(700px 380px at 8% 120%, rgba(13,148,99,.28), transparent 55%),
+    linear-gradient(118deg, var(--petroleo-esc) 0%, var(--petroleo) 32%, var(--azul-esc) 64%, var(--roxo) 100%);
+  color:#fff;
+  padding:34px clamp(20px,4vw,44px) 40px;
+  display:flex; flex-wrap:wrap; gap:24px;
+  align-items:center; justify-content:space-between;
+}
+.topo-esq{display:flex; gap:18px; align-items:center;}
+.topo-icone{
+  width:58px; height:58px; border-radius:16px; flex-shrink:0;
+  background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+  display:flex; align-items:center; justify-content:center;
+  backdrop-filter:blur(6px);
+}
+.topo .rotulo{font-size:.74rem; letter-spacing:.16em; text-transform:uppercase; opacity:.85; font-weight:700;}
+.topo h1{font-size:clamp(1.5rem, 3vw, 2.1rem); font-weight:800; letter-spacing:-.02em; margin:2px 0 4px;}
+.topo p{font-size:.9rem; opacity:.82; font-weight:500;}
+
+.chips{display:flex; gap:14px; flex-wrap:wrap;}
+.chip{
+  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.3);
+  border-radius:14px; padding:12px 16px; min-width:170px;
+  display:flex; gap:12px; align-items:center;
+  backdrop-filter:blur(8px);
+  transition:background var(--t) ease, transform var(--t) ease;
+}
+.chip:hover{background:rgba(255,255,255,.18); transform:translateY(-2px);}
+.chip .ic{opacity:.9; flex-shrink:0;}
+.chip label{display:block; font-size:.7rem; opacity:.85; margin-bottom:2px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;}
+.chip input{
+  background:transparent; border:none; color:#fff; font-size:1rem; font-weight:700;
+  width:100%; outline:none; font-family:inherit;
+}
+.chip input::placeholder{color:rgba(255,255,255,.55); font-weight:500;}
+.chip input::-webkit-calendar-picker-indicator{filter:invert(1); opacity:.8; cursor:pointer;}
+
+/* ============================================================
+   ESTRUTURA
+============================================================ */
+main{max-width:1280px; margin:-18px auto 0; padding:0 clamp(14px,3vw,24px);}
+
+.faixa{
+  background:var(--card); border-radius:var(--raio); box-shadow:var(--sombra);
+  margin-top:20px; padding:clamp(18px,2.4vw,26px);
+}
+h2.secao{
+  font-size:.88rem; font-weight:800; color:var(--tinta); letter-spacing:.06em;
+  text-transform:uppercase; margin-bottom:18px;
+  display:flex; align-items:center; gap:10px;
+}
+h2.secao .sec-ic{
+  width:34px; height:34px; border-radius:10px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+
+.grade{display:grid; gap:16px;}
+.g5{grid-template-columns:repeat(5,1fr);}
+.g6{grid-template-columns:repeat(6,1fr);}
+.g7{grid-template-columns:repeat(7,1fr);}
+.g4{grid-template-columns:repeat(4,1fr);}
+@media (max-width:1120px){
+  .g5,.g6{grid-template-columns:repeat(3,1fr);}
+  .g7{grid-template-columns:repeat(4,1fr);}
+  .g4{grid-template-columns:repeat(2,1fr);}
+}
+@media (max-width:640px){
+  .g5,.g6,.g7{grid-template-columns:repeat(2,1fr);}
+  .g4{grid-template-columns:1fr 1fr;}
+}
+@media (max-width:400px){
+  .g4{grid-template-columns:1fr;}
+}
+
+/* ---------- Cartões de indicador ---------- */
+.item{
+  display:flex; gap:14px; align-items:flex-start;
+  padding:14px; border:1px solid var(--linha); border-radius:var(--raio-int);
+  background:var(--card);
+  transition:transform var(--t) ease, box-shadow var(--t) ease, border-color var(--t) ease;
+}
+.item:hover{transform:translateY(-3px); box-shadow:var(--sombra-hover); border-color:transparent;}
+.icone{
+  width:46px; height:46px; border-radius:13px; display:flex; align-items:center;
+  justify-content:center; flex-shrink:0;
+}
+.item .info{min-width:0; flex:1;}
+.nome{font-size:.68rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--texto-2);}
+.sub{font-size:.72rem; color:var(--texto-2); margin-top:3px; font-weight:500;}
+.valor{
+  font-size:1.4rem; font-weight:800; color:var(--tinta); line-height:1.25;
+  font-variant-numeric:tabular-nums; letter-spacing:-.01em;
+}
+
+/* ---------- Campos de entrada ---------- */
+input.campo{
+  border:1px solid transparent; background:transparent; border-radius:10px;
+  padding:2px 8px; margin:2px 0 0 -8px; width:calc(100% + 8px);
+  font-family:inherit; font-size:1.3rem; font-weight:800; color:var(--tinta);
+  font-variant-numeric:tabular-nums;
+  transition:background var(--t) ease, border-color var(--t) ease, box-shadow var(--t) ease;
+}
+input.campo::placeholder{color:#b6c0cc; font-weight:600;}
+input.campo:hover{background:var(--campo-hover);}
+input.campo:focus{
+  outline:none; background:#fff; border-color:var(--roxo-vivo);
+  box-shadow:0 0 0 3px rgba(124,92,252,.16);
+}
+.campo-menor{font-size:1.1rem !important;}
+.calculado{
+  background:linear-gradient(120deg, var(--tint-roxo), #f7f5ff);
+  border-radius:10px; padding:3px 10px; display:inline-block; margin-top:2px;
+}
+
+/* ============================================================
+   FAZENDAS
+============================================================ */
+.fz-add{display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;}
+.fz-add select, .fz-add input{
+  flex:1; min-width:200px; border:1px solid var(--linha); border-radius:10px; padding:11px 12px;
+  font-family:inherit; font-size:.9rem; font-weight:600; color:var(--tinta); background:#fbfcfe;
+  transition:border-color var(--t) ease, box-shadow var(--t) ease, background var(--t) ease;
+}
+.fz-add select:focus, .fz-add input:focus{outline:none; border-color:var(--roxo-vivo); box-shadow:0 0 0 3px rgba(124,92,252,.16); background:#fff;}
+.fz-add button{flex:0 0 auto;}
+
+.fz-grade{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+@media (max-width:1120px){ .fz-grade{grid-template-columns:repeat(3,1fr);} }
+@media (max-width:760px){ .fz-grade{grid-template-columns:repeat(2,1fr);} }
+@media (max-width:460px){ .fz-grade{grid-template-columns:1fr;} }
+
+.fz-item{
+  border:1px solid var(--roxo-vivo); border-radius:var(--raio-int); padding:14px;
+  display:flex; flex-direction:column; gap:10px;
+  background:linear-gradient(180deg,#faf8ff,#fff); box-shadow:0 4px 14px rgba(124,92,252,.1);
+  animation:surgir .35s ease both;
+}
+.fz-topo{display:flex; align-items:center; gap:10px;}
+.fz-nome{font-size:.92rem; font-weight:800; color:var(--tinta); flex:1; min-width:0; line-height:1.2;}
+.fz-os{font-size:.66rem; font-weight:700; color:var(--roxo); background:var(--tint-roxo); border-radius:6px; padding:2px 7px; white-space:nowrap;}
+.fz-remover{
+  background:transparent; color:#c0b5e0; padding:3px 7px; font-size:1rem; line-height:1; border-radius:6px;
+}
+.fz-remover:hover{background:#fdeaea; color:#c02626; transform:none;}
+.fz-area{display:flex; align-items:center; gap:8px;}
+.fz-area label{font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--texto-2);}
+.fz-area input{
+  flex:1; min-width:0; border:1px solid #ded4fb; border-radius:8px; padding:7px 10px;
+  font-family:inherit; font-size:1.05rem; font-weight:800; color:var(--roxo); background:#fff;
+  font-variant-numeric:tabular-nums;
+}
+.fz-area input:focus{outline:none; border-color:var(--roxo-vivo); box-shadow:0 0 0 3px rgba(124,92,252,.16);}
+.fz-area .un-fixa{font-size:.8rem; font-weight:700; color:var(--texto-2);}
+
+.fz-vazio{color:var(--texto-2); font-size:.85rem; padding:4px 2px;}
+
+.fz-total{
+  margin-top:14px; background:var(--tint-verde); border:1px solid #bfe6d4; border-radius:12px;
+  padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+.fz-total span{font-size:.82rem; font-weight:700; color:var(--verde-esc);}
+.fz-total strong{font-size:1.15rem; font-weight:800; color:var(--verde-esc); font-variant-numeric:tabular-nums;}
+
+/* ============================================================
+   RESUMO + PROGRESSO
+============================================================ */
+.duplo{display:grid; grid-template-columns:1.6fr 1fr; gap:20px; margin-top:20px;}
+.duplo .faixa{margin-top:0;}
+@media (max-width:940px){ .duplo{grid-template-columns:1fr;} }
+
+.cartao-mini{
+  border:1px solid var(--linha); border-radius:var(--raio-int);
+  padding:18px 16px 0; display:flex; flex-direction:column; overflow:hidden;
+  transition:transform var(--t) ease, box-shadow var(--t) ease, border-color var(--t) ease;
+}
+.cartao-mini:hover{transform:translateY(-3px); box-shadow:var(--sombra-hover); border-color:transparent;}
+.cartao-mini .icone{margin-bottom:12px;}
+.cartao-mini .valor-grande{
+  font-size:1.7rem; font-weight:800; margin-top:6px; line-height:1.2;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em;
+}
+.cartao-mini input.campo{font-size:1.7rem; margin-top:4px;}
+.cartao-mini .sub{margin:6px 0 14px;}
+.barra{height:5px; border-radius:3px 3px 0 0; margin:auto -16px 0; transition:filter var(--t) ease;}
+.cartao-mini:hover .barra{filter:brightness(1.1);}
+
+/* ---------- Donut ---------- */
+.donut-caixa{display:flex; gap:26px; align-items:center; flex-wrap:wrap; justify-content:center;}
+.donut{position:relative; width:190px; height:190px; flex-shrink:0;}
+.donut .centro{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+}
+.donut .centro .pct{font-size:2.1rem; font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums;}
+.donut .centro .leg{font-size:.74rem; color:var(--texto-2); font-weight:600; text-transform:uppercase; letter-spacing:.06em;}
+.legenda{display:flex; flex-direction:column; gap:16px;}
+.legenda .linha{display:flex; gap:10px; align-items:flex-start;}
+.ponto{width:11px; height:11px; border-radius:50%; margin-top:5px; flex-shrink:0;}
+.legenda strong{font-size:.78rem; font-weight:700; color:var(--texto-2); text-transform:uppercase; letter-spacing:.05em;}
+.legenda .valor{font-size:1.15rem;}
+.meta-caixa{
+  margin-top:18px; background:var(--tint-roxo); border:1px solid #ded4fb; border-radius:12px;
+  padding:12px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.meta-caixa .rotulo-meta{font-size:.82rem; font-weight:700; color:var(--roxo); display:flex; align-items:center; gap:8px;}
+.meta-caixa input{width:120px; font-size:1.05rem; background:#fff; border-color:#ded4fb; margin:0;}
+.dias-caixa{
+  margin-top:12px; background:var(--tint-petroleo); border:1px solid #bfe0e8; border-radius:12px;
+  padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.dias-caixa .rotulo-meta{color:var(--petroleo);}
+.dias-caixa strong{font-size:1.3rem; font-weight:800; color:var(--petroleo); font-variant-numeric:tabular-nums;}
+
+/* ============================================================
+   BOTÕES
+============================================================ */
+button{
+  font-family:inherit; font-weight:700; border:none; border-radius:12px;
+  padding:11px 18px; cursor:pointer; font-size:.84rem;
+  display:inline-flex; align-items:center; gap:8px;
+  transition:background var(--t) ease, transform var(--t) ease, box-shadow var(--t) ease, color var(--t) ease;
+}
+button:hover{transform:translateY(-1px);}
+button:active{transform:translateY(0);}
+button:focus-visible{outline:3px solid var(--roxo-vivo); outline-offset:2px;}
+.btn-roxo{background:var(--roxo); color:#fff; box-shadow:0 4px 14px rgba(109,40,217,.25);}
+.btn-roxo:hover{background:#5b21b6;}
+.btn-claro{background:var(--tint-roxo); color:var(--roxo);}
+.btn-claro:hover{background:#e2d9fb;}
+.btn-perigo{background:#fdeaea; color:#c02626;}
+.btn-perigo:hover{background:#fbd5d5;}
+
+/* ============================================================
+   OBSERVAÇÕES
+============================================================ */
+.obs-form{display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;}
+.obs-form textarea{
+  flex:1; min-width:220px; border:1px solid var(--linha); border-radius:12px;
+  padding:12px 14px; font-family:inherit; font-size:.9rem; resize:vertical; min-height:48px;
+  color:var(--tinta); background:#fbfcfe;
+  transition:border-color var(--t) ease, box-shadow var(--t) ease, background var(--t) ease;
+}
+.obs-form textarea::placeholder{color:#a3aebb;}
+.obs-form textarea:focus{
+  outline:none; background:#fff; border-color:var(--roxo-vivo);
+  box-shadow:0 0 0 3px rgba(124,92,252,.16);
+}
+ul.obs-lista{list-style:none; display:flex; flex-direction:column; gap:10px;}
+ul.obs-lista li{
+  background:#fafbfe; border:1px solid var(--linha); border-radius:12px;
+  padding:12px 14px; display:flex; gap:12px; align-items:flex-start;
+  animation:surgir .35s ease both;
+}
+ul.obs-lista li .hora{
+  font-size:.72rem; color:var(--roxo); font-weight:800; white-space:nowrap; margin-top:3px;
+  background:var(--tint-roxo); border-radius:7px; padding:3px 8px;
+  font-variant-numeric:tabular-nums;
+}
+ul.obs-lista li .texto{flex:1; font-size:.9rem; line-height:1.5;}
+ul.obs-lista li .texto::before{content:"•"; color:var(--roxo); font-weight:800; margin-right:8px;}
+ul.obs-lista li button{padding:5px 12px; font-size:.74rem;}
+.vazio{color:var(--texto-2); font-size:.85rem; padding:6px 2px;}
+
+/* ============================================================
+   LINHA DO TEMPO
+============================================================ */
+.tl-form{display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;}
+.tl-form select, .tl-form input[type="time"], .tl-form input[type="text"]{
+  border:1px solid var(--linha); border-radius:10px; padding:9px 12px;
+  font-family:inherit; font-size:.86rem; font-weight:600; color:var(--tinta); background:#fbfcfe;
+  transition:border-color var(--t) ease, box-shadow var(--t) ease;
+}
+.tl-form input[type="text"]{flex:1; min-width:150px;}
+.tl-form select:focus, .tl-form input:focus{
+  outline:none; border-color:var(--roxo-vivo); box-shadow:0 0 0 3px rgba(124,92,252,.16); background:#fff;
+}
+.tl-lista{
+  display:flex; align-items:flex-start; gap:0;
+  overflow-x:auto; padding:10px 2px 6px; scrollbar-width:thin;
+}
+.tl-item{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  min-width:118px; flex:0 0 auto; position:relative; padding:0 6px;
+}
+.tl-ponto{
+  width:42px; height:42px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; color:#fff; flex-shrink:0; z-index:1;
+  box-shadow:0 4px 12px rgba(19,37,58,.18);
+  transition:transform var(--t) ease;
+}
+.tl-item:hover .tl-ponto{transform:scale(1.1);}
+.tl-hora{font-size:.86rem; font-weight:800; margin-top:8px; font-variant-numeric:tabular-nums;}
+.tl-desc{font-size:.72rem; color:var(--texto-2); font-weight:500; margin-top:2px; max-width:120px; line-height:1.35;}
+.tl-x{
+  margin-top:6px; padding:2px 9px; font-size:.68rem; border-radius:8px;
+  background:transparent; color:#c8d0da;
+}
+.tl-x:hover{background:#fdeaea; color:#c02626;}
+.tl-seta{
+  flex:0 0 34px; height:2px; background:var(--linha); margin-top:20px;
+  position:relative;
+}
+.tl-seta::after{
+  content:""; position:absolute; right:-1px; top:-3px;
+  border-left:6px solid var(--linha); border-top:4px solid transparent; border-bottom:4px solid transparent;
+}
+
+/* ============================================================
+   RODAPÉ / NAVEGAÇÃO
+============================================================ */
+.rodape{
+  margin-top:22px; background:var(--card); border-radius:var(--raio);
+  box-shadow:var(--sombra); padding:12px 14px;
+  display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+}
+.rodape .nav-btn{
+  background:transparent; color:var(--texto-2); font-size:.82rem; padding:10px 16px;
+}
+.rodape .nav-btn:hover{background:var(--campo-hover); color:var(--tinta); transform:none;}
+.rodape .nav-btn[aria-expanded="true"]{background:var(--roxo); color:#fff; box-shadow:0 4px 14px rgba(109,40,217,.25);}
+.rodape .estado-salvo{
+  margin-left:auto; font-size:.75rem; color:var(--verde); font-weight:600;
+  display:flex; align-items:center; gap:6px; min-height:20px;
+}
+
+.painel-extra{display:none;}
+.painel-extra.aberto{display:block; animation:surgir .4s ease both;}
+
+/* Tabela de dados */
+table.tabela{width:100%; border-collapse:collapse; font-size:.88rem;}
+table.tabela th, table.tabela td{padding:10px 12px; text-align:left; border-bottom:1px solid var(--linha);}
+table.tabela th{
+  font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--texto-2);
+  font-weight:700; background:#fafbfe;
+}
+table.tabela td.v{font-weight:700; font-variant-numeric:tabular-nums;}
+table.tabela tr:last-child td{border-bottom:none;}
+
+/* Histórico */
+.hist-resumo{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px;}
+@media (max-width:760px){ .hist-resumo{grid-template-columns:repeat(2,1fr);} }
+.hist-card{
+  border:1px solid var(--linha); border-radius:var(--raio-int); padding:14px 16px;
+  background:linear-gradient(180deg,#fbfcfe,#fff);
+}
+.hist-card .h-rot{font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--texto-2);}
+.hist-card .h-val{font-size:1.4rem; font-weight:800; margin-top:4px; font-variant-numeric:tabular-nums; letter-spacing:-.01em;}
+.hist-card .h-val .un{font-size:.8rem;}
+#histTabela th, #histTabela td{white-space:nowrap; font-size:.82rem;}
+#histTabela td.fz{white-space:normal; min-width:160px; font-size:.78rem; color:var(--texto-2);}
+.hist-del{padding:3px 9px; font-size:.7rem; background:transparent; color:#c8d0da; border-radius:7px;}
+.hist-del:hover{background:#fdeaea; color:#c02626; transform:none;}
+#histTabela tfoot td{font-weight:800; background:#fafbfe; border-top:2px solid var(--linha); font-variant-numeric:tabular-nums;}
+#histTabela tr.linha-andamento td{background:#fffaf3; color:var(--tinta);}
+.tag-andamento{
+  font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--laranja); background:var(--tint-laranja); border-radius:6px; padding:3px 7px; white-space:nowrap;
+}
+
+/* Sequência das fazendas */
+.seq-busca{
+  width:100%; border:1px solid var(--linha); border-radius:12px; padding:12px 16px;
+  font-family:inherit; font-size:.9rem; color:var(--tinta); background:#fbfcfe; margin-bottom:16px;
+  transition:border-color var(--t) ease, box-shadow var(--t) ease, background var(--t) ease;
+}
+.seq-busca::placeholder{color:#a3aebb;}
+.seq-busca:focus{outline:none; border-color:var(--verde); box-shadow:0 0 0 3px rgba(13,148,99,.15); background:#fff;}
+
+.seq-tabela{border-collapse:separate; border-spacing:0; min-width:1000px;}
+.seq-tabela thead th{
+  background:linear-gradient(120deg, var(--verde-esc), var(--verde));
+  color:#fff; font-size:.64rem; letter-spacing:.07em; padding:12px 10px; white-space:nowrap;
+}
+.seq-tabela thead th:first-child{border-radius:10px 0 0 0;}
+.seq-tabela thead th:last-child{border-radius:0 10px 0 0;}
+.seq-tabela th.num, .seq-tabela td.num{text-align:right;}
+.seq-tabela tbody td{padding:12px 10px; font-size:.84rem; vertical-align:middle; white-space:nowrap;}
+.seq-tabela tbody tr:hover td{background:#fafcfb;}
+.seq-tabela tbody tr.seq-concluida td{background:#f2fbf7;}
+.seq-tabela tbody tr.seq-concluida:hover td{background:#e9f8f1;}
+.seq-num{font-weight:800; color:var(--verde-esc); font-variant-numeric:tabular-nums;}
+.seq-fn{font-family:ui-monospace, Consolas, monospace; font-size:.8rem; color:var(--texto-2); font-weight:700;}
+.seq-nome{font-weight:700; color:var(--tinta);}
+.seq-area{font-variant-numeric:tabular-nums; font-weight:600;}
+.seq-saldo{font-variant-numeric:tabular-nums; font-weight:800;}
+.seq-aplic{
+  width:96px; border:1px solid var(--linha); border-radius:8px; padding:6px 9px; text-align:right;
+  font-family:inherit; font-size:.86rem; font-weight:800; color:var(--verde-esc); background:#fff;
+  font-variant-numeric:tabular-nums;
+}
+.seq-aplic:focus{outline:none; border-color:var(--verde); box-shadow:0 0 0 3px rgba(13,148,99,.15);}
+.chip-st{
+  display:inline-block; min-width:42px; text-align:center; font-size:.66rem; font-weight:800;
+  border-radius:8px; padding:4px 9px; letter-spacing:.03em;
+}
+.chip-ok{background:var(--tint-verde); color:var(--verde-esc);}
+.chip-off{background:#fdf6e7; color:#b98b2e;}
+.seq-prog{display:flex; align-items:center; gap:9px; min-width:130px;}
+.seq-prog .trilha{flex:1; height:7px; background:#e9edf3; border-radius:4px; overflow:hidden;}
+.seq-prog .fill{height:100%; border-radius:4px; width:0; transition:width .6s cubic-bezier(.22,.8,.35,1);}
+.seq-prog .fill.f-ok{background:linear-gradient(90deg,var(--verde),#7fd9b4);}
+.seq-prog .fill.f-and{background:linear-gradient(90deg,var(--petroleo),#5fb3c4);}
+.seq-prog .pctxt{font-size:.72rem; font-weight:800; color:var(--texto-2); min-width:34px; text-align:right; font-variant-numeric:tabular-nums;}
+.btn-concluir{
+  background:#fff; border:1px solid var(--linha); color:var(--texto-2);
+  padding:6px 14px; font-size:.74rem; border-radius:9px;
+}
+.btn-concluir:hover{background:var(--tint-verde); color:var(--verde-esc); border-color:var(--verde); transform:none;}
+.btn-concluir.ativo{background:var(--verde); color:#fff; border-color:var(--verde);}
+.btn-concluir.ativo:hover{background:var(--verde-esc); color:#fff;}
+.seq-tabela tfoot td{
+  background:var(--tinta); color:#fff; font-weight:800; padding:14px 10px; font-size:.82rem;
+  font-variant-numeric:tabular-nums;
+}
+.seq-tabela tfoot td:first-child{border-radius:0 0 0 10px;}
+.seq-tabela tfoot td:last-child{border-radius:0 0 10px 0;}
+.seq-grupos{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:20px; align-items:start;}
+@media (max-width:900px){ .seq-grupos{grid-template-columns:1fr;} }
+.gr-col{border:1px solid var(--linha); border-radius:var(--raio-int); overflow:hidden; background:#fff; display:flex; flex-direction:column;}
+.gr-topo{padding:12px 14px; display:flex; align-items:center; gap:9px; color:#fff;}
+.gr-topo .gr-tit{font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; flex:1;}
+.gr-topo .gr-qtd{
+  font-size:.72rem; font-weight:800; background:rgba(255,255,255,.24);
+  border-radius:20px; padding:3px 10px; font-variant-numeric:tabular-nums;
+}
+.gr-verde{background:linear-gradient(120deg,var(--verde-esc),var(--verde));}
+.gr-azul{background:linear-gradient(120deg,var(--petroleo-esc),var(--petroleo));}
+.gr-cinza{background:linear-gradient(120deg,#5b6675,#78859a);}
+.gr-lista{list-style:none; padding:8px; display:flex; flex-direction:column; gap:6px; flex:1;}
+.gr-lista li{
+  display:flex; align-items:center; gap:9px; padding:9px 10px;
+  border-radius:10px; background:#fafbfe; font-size:.83rem;
+}
+.gr-lista li.proxima{background:var(--tint-laranja); border:1px solid #f6cfae;}
+.gr-tag{
+  font-size:.66rem; font-weight:800; border-radius:7px; padding:3px 8px;
+  background:#fff; border:1px solid var(--linha); color:var(--texto-2); white-space:nowrap;
+}
+.gr-lista li.proxima .gr-tag{background:var(--laranja); color:#fff; border-color:var(--laranja);}
+.gr-nome{flex:1; font-weight:700; color:var(--tinta); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.gr-ha{font-size:.75rem; font-weight:700; color:var(--texto-2); font-variant-numeric:tabular-nums; white-space:nowrap;}
+.gr-rodape{
+  padding:10px 14px; border-top:1px solid var(--linha); background:#fafbfe;
+  font-size:.75rem; font-weight:800; display:flex; justify-content:space-between; gap:8px;
+  font-variant-numeric:tabular-nums;
+}
+.gr-vazia{padding:16px 12px; text-align:center; color:var(--texto-2); font-size:.8rem;}
+.seq-vazio{text-align:center; color:var(--texto-2); font-size:.85rem; padding:20px;}
+
+/* legenda que só aparece na imagem salva */
+.seq-legenda{display:none; margin-bottom:16px;}
+.seq-legenda .lg-tit{font-size:1.05rem; font-weight:800; color:var(--tinta); letter-spacing:-.01em;}
+.seq-legenda .lg-sub{font-size:.8rem; color:var(--texto-2); font-weight:600; margin-top:3px;}
+
+/* modo de captura da sequência: esconde controles */
+body.cap-seq .seq-legenda{display:block;}
+body.cap-seq .seq-busca,
+body.cap-seq #btnCopiarSeq,
+body.cap-seq #btnImagemSeq,
+body.cap-seq #btnPuxarHistorico,
+body.cap-seq .col-acao{display:none !important;}
+body.cap-seq #painelSequencia{box-shadow:none; margin:0; padding:24px;}
+
+/* o html2canvas lava os gradientes: na imagem usamos cores sólidas */
+body.cap-seq .gr-verde{background:#0a7c55 !important;}
+body.cap-seq .gr-azul{background:#0e5a6d !important;}
+body.cap-seq .gr-cinza{background:#5b6675 !important;}
+body.cap-seq .seq-tabela thead th{background:#0a7c55 !important;}
+body.cap-seq .seq-tabela tfoot td{background:#13253a !important;}
+body.cap-seq .seq-prog .fill.f-ok{background:#0d9463 !important;}
+body.cap-seq .seq-prog .fill.f-and{background:#0e5a6d !important;}
+body.cap-seq .chip-ok{background:#d6f2e6 !important; color:#065f42 !important;}
+body.cap-seq .chip-off{background:#f4f1e8 !important; color:#8a7332 !important;}
+body.cap-seq .gr-lista li.proxima{background:#fdeee2 !important; border-color:#f0b98a !important;}
+body.cap-seq .gr-lista li.proxima .gr-tag{background:#e2560a !important; color:#fff !important; border-color:#e2560a !important;}
+body.cap-seq .seq-nome, body.cap-seq .gr-nome{color:#0f2135 !important;}
+body.cap-seq .seq-num{color:#065f42 !important;}
+body.cap-seq .seq-saldo, body.cap-seq .seq-area{color:#0f2135 !important;}
+
+/* nada pode ficar cortado na imagem */
+body.cap-seq #painelSequencia [style*="overflow-x"]{overflow:visible !important;}
+body.cap-seq .seq-tabela{min-width:0; width:100%;}
+body.cap-seq .seq-grupos{align-items:start;}
+
+/* Gráficos */
+.gbar-grupo{margin-bottom:22px;}
+.gbar-titulo{font-size:.76rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--texto-2); margin-bottom:12px;}
+.gbar{display:flex; align-items:center; gap:12px; margin-bottom:10px;}
+.gbar .gbar-rotulo{width:190px; font-size:.78rem; font-weight:700; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.gbar .gbar-trilha{flex:1; height:16px; background:#eef1f6; border-radius:8px; overflow:hidden;}
+.gbar .gbar-fill{height:100%; border-radius:8px; width:0; transition:width .7s cubic-bezier(.22,.8,.35,1);}
+.gbar .gbar-valor{width:130px; font-size:.76rem; font-weight:800; text-align:right; font-variant-numeric:tabular-nums; flex-shrink:0;}
+@media (max-width:640px){
+  .gbar .gbar-rotulo{width:120px; font-size:.72rem;}
+  .gbar .gbar-valor{width:100px; font-size:.7rem;}
+}
+
+/* Relatórios */
+#relatorioTexto{
+  width:100%; min-height:230px; border:1px solid var(--linha); border-radius:12px;
+  padding:14px; font-family:ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size:.8rem; line-height:1.6; color:var(--tinta); background:#fafbfe; resize:vertical;
+}
+#relatorioTexto:focus{outline:none; border-color:var(--roxo-vivo); box-shadow:0 0 0 3px rgba(124,92,252,.16);}
+
+/* Configurações */
+.config-linha{
+  display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding:14px 0;
+  border-bottom:1px solid var(--linha);
+}
+.config-linha:last-child{border-bottom:none;}
+.config-linha .desc{flex:1; min-width:220px;}
+.config-linha .desc strong{display:block; font-size:.88rem; margin-bottom:2px;}
+.config-linha .desc span{font-size:.78rem; color:var(--texto-2);}
+
+.acoes{display:flex; gap:10px; flex-wrap:wrap; margin-top:18px;}
+
+/* ============================================================
+   EXPORTAÇÃO (PDF / IMAGEM)
+============================================================ */
+body.capturando .obs-form,
+body.capturando .tl-form,
+body.capturando .rodape,
+body.capturando .painel-extra,
+body.capturando .acoes,
+body.capturando .tl-x,
+body.capturando ul.obs-lista li button,
+body.capturando .vazio{display:none !important;}
+body.capturando .anim{animation:none !important;}
+body.capturando #capturaWrap{padding-bottom:24px; background:#f4f6fa;}
+body.capturando main{margin-top:0 !important;}
+body.capturando .topo{border-radius:0 !important;}
+
+@media print{
+  @page{size:A4 landscape; margin:8mm;}
+  *{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  body{background:#fff; padding-bottom:0;}
+  .obs-form, .tl-form, .rodape, .painel-extra, .acoes, .tl-x,
+  ul.obs-lista li button, .vazio{display:none !important;}
+  .anim{animation:none !important;}
+  .faixa, .item, .cartao-mini{box-shadow:none; break-inside:avoid;}
+  .duplo{break-inside:avoid;}
+  main{max-width:100%; margin-top:0;}
+  .topo{border-radius:0 0 20px 20px;}
+}
+</style>
+</head>
+<body>
+<div id="capturaWrap">
+
+<!-- ============================ CABEÇALHO ============================ -->
+<header class="topo anim">
+  <div class="topo-esq">
+    <div class="topo-icone" aria-hidden="true">
+      <!-- drone -->
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="5" cy="5" r="2.4"/><circle cx="19" cy="5" r="2.4"/>
+        <circle cx="5" cy="19" r="2.4"/><circle cx="19" cy="19" r="2.4"/>
+        <path d="M6.7 6.7l2.3 2.3M17.3 6.7L15 9M6.7 17.3L9 15M17.3 17.3L15 15"/>
+        <rect x="9" y="9" width="6" height="6" rx="1.6"/>
+      </svg>
+    </div>
+    <div class="titulo">
+      <div class="rotulo">Aplicação com Drone</div>
+      <h1>Acompanhamento Diário</h1>
+      <p>Gestão de aplicações agrícolas com precisão e eficiência</p>
+    </div>
+  </div>
+  <div class="chips">
+    <div class="chip">
+      <span class="ic" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      </span>
+      <div style="flex:1; min-width:0;">
+        <label for="data">Data</label>
+        <input type="date" id="data">
+      </div>
+    </div>
+    <div class="chip">
+      <span class="ic" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 1-1h11l-2 4 2 4H5"/></svg>
+      </span>
+      <div style="flex:1; min-width:0;">
+        <label for="campanha">Campanha / Safra</label>
+        <input type="text" id="campanha" placeholder="Ex.: 14/07 — Safra 2026">
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============================ LINHA 1 — INDICADORES DO DIA ============================ -->
+  <section class="faixa anim d1" aria-label="Indicadores do dia">
+    <div class="grade g5">
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-verde); color:var(--verde-esc);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Hora inicial</div>
+          <input type="time" class="campo" id="horaIni">
+          <div class="sub">Início das atividades</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-laranja); color:var(--laranja);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l-3 2"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Hora final</div>
+          <input type="time" class="campo" id="horaFim">
+          <div class="sub">Término das atividades</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-azul); color:var(--azul-esc);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4M12 14l3-3"/><circle cx="12" cy="14" r="8"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Duração</div>
+          <div class="valor calculado" id="duracao">—</div>
+          <div class="sub">Tempo total de aplicação</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-roxo); color:var(--roxo);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 17a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.3 1.4A4 4 0 0 0 7 17"/><path d="M8 20v1M12 19v2M16 20v1"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Aplicação do dia</div>
+          <div class="valor calculado" id="aplicacaoDia">0 <span class="un">ha</span></div>
+          <div class="sub">Área aplicada hoje</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-verde); color:var(--verde-esc);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Hectare / hora</div>
+          <div class="valor calculado" id="haHora">—</div>
+          <div class="sub">Produtividade média</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================ LINHA 2 — CLIMA ============================ -->
+  <section class="faixa anim d2" aria-label="Condições climáticas">
+    <div class="grade g6" id="gradeClima">
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-laranja); color:var(--laranja);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Temp. inicial</div>
+          <input type="text" inputmode="decimal" class="campo campo-menor" id="tempIni" placeholder="°C">
+          <div class="sub">na hora inicial</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-laranja); color:var(--laranja);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/><path d="M12 9v6"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Temp. final</div>
+          <input type="text" inputmode="decimal" class="campo campo-menor" id="tempFim" placeholder="°C">
+          <div class="sub">na hora final</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-petroleo); color:var(--petroleo);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.3 6 11a6 6 0 0 1-12 0c0-4.7 6-11 6-11z"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Umidade inicial</div>
+          <input type="text" inputmode="decimal" class="campo campo-menor" id="umidIni" placeholder="%">
+          <div class="sub">na hora inicial</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-petroleo); color:var(--petroleo);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.3 6 11a6 6 0 0 1-12 0c0-4.7 6-11 6-11z"/><path d="M9.5 14a2.5 2.5 0 0 0 2.5 2.5"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Umidade final</div>
+          <input type="text" inputmode="decimal" class="campo campo-menor" id="umidFim" placeholder="%">
+          <div class="sub">na hora final</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-azul); color:var(--azul-esc);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9a3 3 0 1 0-3-3M3 12h13a3 3 0 1 1-3 3M3 16h6"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Vento inicial</div>
+          <input type="text" inputmode="decimal" class="campo campo-menor" id="ventoIni" placeholder="km/h">
+          <div class="sub">na hora inicial</div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="icone" style="background:var(--tint-azul); color:var(--azul-esc);" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h11a3 3 0 1 0-3-3M3 10h15a3 3 0 1 1-3 3M3 14h8M3 18h5"/></svg>
+        </div>
+        <div class="info">
+          <div class="nome">Vento final</div>
+          <input type="text" inputmode="decimal" class="campo campo-menor" id="ventoFim" placeholder="km/h">
+          <div class="sub">na hora final</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================ LINHA 2b — FAZENDAS ============================ -->
+  <section class="faixa anim d2" aria-label="Fazendas aplicadas">
+    <h2 class="secao" style="justify-content:space-between;">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <span class="sec-ic" style="background:var(--tint-roxo); color:var(--roxo);" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+        </span>
+        Fazendas aplicadas
+      </span>
+      <span id="fzResumo" style="font-size:.72rem; font-weight:700; color:var(--texto-2); text-transform:none; letter-spacing:0;"></span>
+    </h2>
+
+    <div class="fz-add">
+      <select id="fzSelect" aria-label="Selecionar fazenda">
+        <option value="">Selecione uma fazenda…</option>
+      </select>
+      <input type="text" id="fzNova" placeholder="…ou digite uma nova fazenda" aria-label="Nova fazenda" style="display:none;">
+      <button class="btn-roxo" id="btnAddFazenda" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Adicionar
+      </button>
+    </div>
+
+    <div class="fz-grade" id="fzGrade"></div>
+    <div class="fz-vazio" id="fzVazio">Nenhuma fazenda adicionada. Selecione acima e clique em Adicionar.</div>
+
+    <div class="fz-total" id="fzTotalCaixa" style="display:none;">
+      <span>Área total das fazendas adicionadas</span>
+      <strong id="fzTotal">0 ha</strong>
+    </div>
+  </section>
+
+  <!-- ============================ LINHA 3 — RESUMO + PROGRESSO ============================ -->
+  <div class="duplo anim d3">
+
+    <section class="faixa" aria-label="Resumo operacional">
+      <h2 class="secao">
+        <span class="sec-ic" style="background:var(--tint-petroleo); color:var(--petroleo);" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 20V12M12 20V6M19 20v-5"/></svg>
+        </span>
+        Resumo operacional
+      </h2>
+      <div class="grade g4">
+
+        <div class="cartao-mini">
+          <div class="icone" style="background:var(--tint-roxo); color:var(--roxo);" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/><circle cx="5" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/><path d="M6.6 6.6l2.4 2.4M17.4 6.6L15 9M6.6 17.4L9 15M17.4 17.4L15 15"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+          </div>
+          <div class="nome">T70 D</div>
+          <input type="text" inputmode="decimal" class="campo" id="t70d" placeholder="0" style="color:var(--roxo);">
+          <div class="sub">Área aplicada (ha)</div>
+          <div class="barra" style="background:linear-gradient(90deg,var(--roxo-vivo),#ded4fb);"></div>
+        </div>
+
+        <div class="cartao-mini">
+          <div class="icone" style="background:var(--tint-petroleo); color:var(--petroleo);" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/><circle cx="5" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/><path d="M6.6 6.6l2.4 2.4M17.4 6.6L15 9M6.6 17.4L9 15M17.4 17.4L15 15"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+          </div>
+          <div class="nome">T70 A</div>
+          <input type="text" inputmode="decimal" class="campo" id="t70a" placeholder="0" style="color:var(--petroleo);">
+          <div class="sub">Área aplicada (ha)</div>
+          <div class="barra" style="background:linear-gradient(90deg,var(--petroleo),#bfe0e8);"></div>
+        </div>
+
+        <div class="cartao-mini">
+          <div class="icone" style="background:var(--tint-verde); color:var(--verde-esc);" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M12 10c0-4 3-6 7-6 0 4-3 6-7 6z"/><path d="M12 14c0-3-2.5-5-6-5 0 3.5 2.5 5 6 5z"/><path d="M5 20h14"/></svg>
+          </div>
+          <div class="nome">Área total aplicada</div>
+          <div class="valor-grande" id="totalAeronaves" style="color:var(--verde-esc);">0 <span class="un">ha</span></div>
+          <div class="sub">Total das aeronaves</div>
+          <div class="barra" style="background:linear-gradient(90deg,var(--verde),#bceedd);"></div>
+        </div>
+
+        <div class="cartao-mini">
+          <div class="icone" style="background:var(--tint-laranja); color:var(--laranja);" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 1-1h11l-2 4 2 4H5"/></svg>
+          </div>
+          <div class="nome">Acumulado da campanha</div>
+          <div class="valor-grande" id="acumulado" style="color:var(--laranja);">0 <span class="un">ha</span></div>
+          <div class="sub" id="acumSub">Soma dos dias fechados</div>
+          <div class="barra" style="background:linear-gradient(90deg,var(--laranja),#fcd9bd);"></div>
+        </div>
+
+      </div>
+      <div class="acoes">
+        <button class="btn-roxo" id="btnFecharDia" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 6"/></svg>
+          Fechar dia e salvar no histórico
+        </button>
+      </div>
+    </section>
+
+    <section class="faixa" aria-label="Progresso da campanha">
+      <h2 class="secao">
+        <span class="sec-ic" style="background:var(--tint-roxo); color:var(--roxo);" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
+        </span>
+        Progresso da campanha
+      </h2>
+      <div class="donut-caixa">
+        <div class="donut" role="img" aria-label="Progresso da campanha">
+          <svg width="190" height="190" viewBox="0 0 180 180">
+            <g transform="rotate(-90 90 90)">
+              <circle cx="90" cy="90" r="78" fill="none" stroke="#eceff5" stroke-width="16"/>
+              <circle id="arco" cx="90" cy="90" r="78" fill="none" stroke="url(#gradArco)"
+                      stroke-width="16" stroke-linecap="round"
+                      stroke-dasharray="490.09" stroke-dashoffset="490.09"
+                      style="transition:stroke-dashoffset .8s cubic-bezier(.22,.8,.35,1);"/>
+            </g>
+            <defs>
+              <linearGradient id="gradArco" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#7c5cfc"/>
+                <stop offset="100%" stop-color="#0e5a6d"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="centro">
+            <div class="pct" id="pct">0%</div>
+            <div class="leg">Concluído</div>
+          </div>
+        </div>
+        <div class="legenda">
+          <div class="linha">
+            <span class="ponto" style="background:var(--roxo);"></span>
+            <span><strong>Concluído</strong><br><span id="legConcluido" class="valor">0 ha</span></span>
+          </div>
+          <div class="linha">
+            <span class="ponto" style="background:#cfd6df;"></span>
+            <span><strong>Restante</strong><br><span id="legRestante" class="valor">0 ha</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="meta-caixa">
+        <span class="rotulo-meta">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
+          Total da campanha
+        </span>
+        <input type="text" inputmode="decimal" class="campo" id="meta" placeholder="ha">
+        <span class="un">ha</span>
+      </div>
+      <div class="dias-caixa" id="diasCaixa">
+        <span class="rotulo-meta">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          Dias de operação
+        </span>
+        <strong id="diasCount">0</strong>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============================ LINHA 4 — OBSERVAÇÕES + LINHA DO TEMPO ============================ -->
+  <div class="duplo anim d4" style="grid-template-columns:1fr 1.25fr;">
+
+    <section class="faixa" aria-label="Observações">
+      <h2 class="secao">
+        <span class="sec-ic" style="background:var(--tint-roxo); color:var(--roxo);" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+        </span>
+        Observações
+      </h2>
+      <div class="obs-form">
+        <textarea id="obsTexto" placeholder="Escreva uma observação e clique em Adicionar. Ex.: Vento acima do limite às 08:30, aguardando melhora das condições."></textarea>
+        <button class="btn-roxo" id="btnAddObs" type="button">Adicionar</button>
+      </div>
+      <ul class="obs-lista" id="obsLista"></ul>
+      <div class="vazio" id="obsVazio">Nenhuma observação registrada ainda.</div>
+    </section>
+
+    <section class="faixa" aria-label="Linha do tempo">
+      <h2 class="secao">
+        <span class="sec-ic" style="background:var(--tint-petroleo); color:var(--petroleo);" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4M10 12h4M17 12h4"/><circle cx="7" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="14" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="21" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+        </span>
+        Linha do tempo
+      </h2>
+      <div class="tl-form">
+        <select id="tipoEvento" aria-label="Tipo do evento">
+          <option value="inicio">Início</option>
+          <option value="pausa">Pausa</option>
+          <option value="retorno">Retomada</option>
+          <option value="manutencao">Manutenção</option>
+          <option value="fim">Fim</option>
+          <option value="outro">Outro</option>
+        </select>
+        <input type="time" id="horaEvento" aria-label="Hora do evento">
+        <input type="text" id="textoEvento" placeholder="Descrição breve (opcional)" aria-label="Descrição do evento">
+        <button class="btn-roxo" id="btnAddEvento" type="button">Registrar</button>
+      </div>
+      <div class="tl-lista" id="timelineLista"></div>
+      <div class="vazio" id="timelineVazio">Nenhum evento registrado. Registre o início da aplicação acima.</div>
+    </section>
+
+  </div>
+
+  <!-- ============================ RODAPÉ / NAVEGAÇÃO ============================ -->
+  <nav class="rodape anim d5" aria-label="Navegação do painel">
+    <button class="nav-btn" id="navTabela" type="button" aria-expanded="false" aria-controls="painelTabela">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
+      Tabela de dados
+    </button>
+    <button class="nav-btn" id="navSequencia" type="button" aria-expanded="false" aria-controls="painelSequencia">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      Sequência
+    </button>
+    <button class="nav-btn" id="navHistorico" type="button" aria-expanded="false" aria-controls="painelHistorico">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+      Histórico
+    </button>
+    <button class="nav-btn" id="navGraficos" type="button" aria-expanded="false" aria-controls="painelGraficos">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V12M12 20V6M19 20v-5"/></svg>
+      Gráficos
+    </button>
+    <button class="nav-btn" id="navRelatorios" type="button" aria-expanded="false" aria-controls="painelRelatorios">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13h6M9 17h6"/></svg>
+      Relatórios
+    </button>
+    <button class="nav-btn" id="navConfig" type="button" aria-expanded="false" aria-controls="painelConfig">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h0a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56h0a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v0a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1z"/></svg>
+      Configurações
+    </button>
+    <button class="btn-claro" id="btnExportPdf" type="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg>
+      Salvar PDF
+    </button>
+    <button class="btn-claro" id="btnExportImg" type="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5-9 9"/></svg>
+      Salvar imagem
+    </button>
+    <span class="estado-salvo" id="avisoSalvo"></span>
+  </nav>
+
+  <!-- Painéis do rodapé -->
+  <section class="faixa painel-extra" id="painelTabela" aria-label="Tabela de dados">
+    <h2 class="secao">
+      <span class="sec-ic" style="background:var(--tint-azul); color:var(--azul-esc);" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
+      </span>
+      Tabela de dados do dia
+    </h2>
+    <div style="overflow-x:auto;">
+      <table class="tabela">
+        <thead><tr><th>Indicador</th><th>Valor</th></tr></thead>
+        <tbody id="tabelaCorpo"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="faixa painel-extra" id="painelSequencia" aria-label="Sequência das fazendas">
+    <h2 class="secao" style="justify-content:space-between;">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <span class="sec-ic" style="background:var(--tint-verde); color:var(--verde-esc);" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        </span>
+        Sequência das fazendas
+      </span>
+      <span style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-claro" id="btnCopiarSeq" type="button" style="text-transform:none; letter-spacing:0;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copiar resumo
+        </button>
+        <button class="btn-roxo" id="btnImagemSeq" type="button" style="text-transform:none; letter-spacing:0;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5-9 9"/></svg>
+          Salvar imagem
+        </button>
+        <button class="btn-claro" id="btnPuxarHistorico" type="button" style="text-transform:none; letter-spacing:0;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 8v4l3 2"/></svg>
+          Preencher pelo histórico
+        </button>
+      </span>
+    </h2>
+
+    <div class="seq-legenda" id="seqLegenda"></div>
+
+    <div class="seq-grupos" id="seqGrupos"></div>
+
+    <input type="text" id="seqBusca" class="seq-busca" placeholder="Pesquisar por fazenda ou FN…" aria-label="Pesquisar fazenda">
+
+    <div style="overflow-x:auto;">
+      <table class="tabela seq-tabela" id="seqTabela">
+        <thead><tr>
+          <th>Sequência</th><th>FN</th><th>Fazenda</th>
+          <th class="num">Área (ha)</th><th class="num">Aplicado (ha)</th><th class="num">Saldo (ha)</th>
+          <th>Programada</th><th>Em and.</th><th>Concluída</th><th>Progresso</th><th class="col-acao">Ação</th>
+        </tr></thead>
+        <tbody id="seqCorpo"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="faixa painel-extra" id="painelHistorico" aria-label="Histórico da campanha">
+    <h2 class="secao" style="justify-content:space-between;">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <span class="sec-ic" style="background:var(--tint-petroleo); color:var(--petroleo);" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+        </span>
+        Histórico da campanha
+      </span>
+      <button class="btn-claro" id="btnCopiarHistorico" type="button" style="text-transform:none; letter-spacing:0;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar
+      </button>
+    </h2>
+
+    <div class="hist-resumo" id="histResumo"></div>
+
+    <div style="overflow-x:auto;">
+      <table class="tabela" id="histTabela">
+        <thead><tr>
+          <th>#</th><th>Data</th><th>Início</th><th>Fim</th><th>Duração</th>
+          <th>Fazendas</th><th>T70 D</th><th>T70 A</th><th>Total dia</th><th></th>
+        </tr></thead>
+        <tbody id="histCorpo"></tbody>
+      </table>
+    </div>
+    <div class="vazio" id="histVazio">Nenhum dia fechado ainda. Use "Fechar dia e salvar no histórico" no resumo operacional.</div>
+  </section>
+
+  <section class="faixa painel-extra" id="painelGraficos" aria-label="Gráficos">
+    <h2 class="secao">
+      <span class="sec-ic" style="background:var(--tint-petroleo); color:var(--petroleo);" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 20V12M12 20V6M19 20v-5"/></svg>
+      </span>
+      Gráficos do dia
+    </h2>
+    <div id="graficoBarras"></div>
+  </section>
+
+  <section class="faixa painel-extra" id="painelRelatorios" aria-label="Relatórios">
+    <h2 class="secao">
+      <span class="sec-ic" style="background:var(--tint-verde); color:var(--verde-esc);" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
+      </span>
+      Relatório do dia
+    </h2>
+    <textarea id="relatorioTexto" readonly aria-label="Relatório gerado"></textarea>
+    <div class="acoes">
+      <button class="btn-roxo" id="btnCopiarRelatorio" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar relatório
+      </button>
+      <span class="vazio" id="avisoCopiado"></span>
+    </div>
+  </section>
+
+  <section class="faixa painel-extra" id="painelConfig" aria-label="Configurações">
+    <h2 class="secao">
+      <span class="sec-ic" style="background:var(--tint-roxo); color:var(--roxo);" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+      </span>
+      Configurações
+    </h2>
+    <div class="config-linha">
+      <div class="desc">
+        <strong>Novo dia</strong>
+        <span>Limpa horários, clima, áreas do dia, observações e linha do tempo do dia atual, sem fechar (não salva no histórico). O total da campanha e o histórico de dias fechados são mantidos.</span>
+      </div>
+      <button class="btn-perigo" id="btnNovoDia" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        Novo dia
+      </button>
+    </div>
+    <div class="config-linha">
+      <div class="desc">
+        <strong>Limpar histórico da campanha</strong>
+        <span>Apaga todos os dias fechados e zera o acumulado. O total da campanha definido é mantido. Ação irreversível.</span>
+      </div>
+      <button class="btn-perigo" id="btnLimparHistorico" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        Limpar histórico
+      </button>
+    </div>
+    <div class="config-linha">
+      <div class="desc">
+        <strong>Salvamento automático</strong>
+        <span>Todos os dados são salvos automaticamente neste dispositivo enquanto você digita.</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+</div><!-- /capturaWrap -->
+
+<script>
+(function(){
+  "use strict";
+
+  var CHAVE = "acomp-diario-drone-v1";
+  var CIRC = 2 * Math.PI * 78; // 490.09
+  var reduzMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var fmt = new Intl.NumberFormat("pt-BR", {maximumFractionDigits: 1});
+  var fmt2 = new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+  // Catálogo de fazendas do lote pré-seca, na ordem oficial da sequência
+  var CATALOGO_FAZENDAS = [
+    {seq:1,  fn:"064", nome:"São Jose do Lago", area:268.45},
+    {seq:2,  fn:"011", nome:"Santaneza",        area:79.36},
+    {seq:3,  fn:"030", nome:"Harmonia",         area:181.31},
+    {seq:4,  fn:"061", nome:"Sto Antonio",      area:214.39},
+    {seq:5,  fn:"067", nome:"São João",         area:35.76},
+    {seq:6,  fn:"153", nome:"Zeu",              area:90.81},
+    {seq:7,  fn:"115", nome:"Três Barras",      area:37.17},
+    {seq:8,  fn:"058", nome:"Santana Nova",     area:375.25},
+    {seq:9,  fn:"135", nome:"Carolina I",       area:103.84},
+    {seq:10, fn:"142", nome:"Carolina II",      area:133.41},
+    {seq:11, fn:"059", nome:"Santana Velha",    area:197.72},
+    {seq:12, fn:"118", nome:"Três Árvores",     area:71.92},
+    {seq:13, fn:"009", nome:"Bassite",          area:105.76},
+    {seq:14, fn:"139", nome:"Ligeiro",          area:114.89},
+    {seq:15, fn:"083", nome:"Sitio Emilio II",  area:78.09},
+    {seq:16, fn:"120", nome:"Flora I",          area:200.08}
+  ];
+
+  // nomes que já foram usados antes, para não perder dados salvos
+  var RENOMES = {"Santo Antonio":"Sto Antonio", "Emilio II":"Sitio Emilio II"};
+
+  var estado = {
+    data: "", campanha: "",
+    horaIni: "", horaFim: "",
+    tempIni: "", tempFim: "", umidIni: "", umidFim: "",
+    ventoIni: "", ventoFim: "",
+    t70d: "", t70a: "",
+    meta: "2288,21",
+    fazendas: [],       // {nome, os, area:""}
+    obs: [],            // {texto}
+    timeline: [],       // {tipo, hora, texto}
+    diasFechados: [],   // registros de dias fechados (snapshot completo)
+    seqDados: {}        // por fazenda: {aplicado:"", concluida:false}
+  };
+
+  // Dias já realizados (pré-carregados na primeira abertura).
+  // Só entram se ainda não houver histórico salvo no dispositivo.
+  var CAMPANHA_INICIAL = "Pré-Seca";
+  // fazendas já dadas como concluídas (FN 64 e FN 67, conforme observações dos dias)
+  var CONCLUIDAS_INICIAIS = ["São Jose do Lago", "São João"];
+  var DIAS_INICIAIS = [
+    {
+      data: "2026-07-17", campanha: "Pré-Seca",
+      horaIni: "", horaFim: "", duracao: "", haHora: "",
+      tempIni: "", tempFim: "", umidIni: "", umidFim: "", ventoIni: "", ventoFim: "",
+      t70d: "", t70a: "", totalDia: 62.02,
+      fazendas: [{nome:"São Jose do Lago", area:"62,02"}],
+      fazendasTexto: "São Jose do Lago",
+      obs: [], timeline: [], fechadoEm: "2026-07-17T23:59:00"
+    },
+    {
+      data: "2026-07-18", campanha: "São Jose do Lago",
+      horaIni: "19:00", horaFim: "02:00", duracao: "7h00", haHora: "29,46 ha/h",
+      tempIni: "21", tempFim: "19", umidIni: "59", umidFim: "82", ventoIni: "5", ventoFim: "6",
+      t70d: "91,25", t70a: "115", totalDia: 206.25,
+      fazendas: [{nome:"São Jose do Lago", area:"206,25"}],
+      fazendasTexto: "São Jose do Lago",
+      obs: ["FN 64-Concluído"], timeline: [], fechadoEm: "2026-07-18T23:59:00"
+    },
+    {
+      data: "2026-07-19", campanha: "Pré-Seca",
+      horaIni: "18:20", horaFim: "03:16", duracao: "8h56", haHora: "28,26 ha/h",
+      tempIni: "22", tempFim: "17", umidIni: "57", umidFim: "65", ventoIni: "4", ventoFim: "5",
+      t70d: "132,66", t70a: "119,8", totalDia: 252.46,
+      fazendas: [{nome:"Santaneza", area:"79,36"}, {nome:"Harmonia", area:"173,10"}],
+      fazendasTexto: "Santaneza, Harmonia",
+      obs: ["FN 11 Santaneza - Concluímos", "FN 30 Harmonia - Concluímos"],
+      timeline: [], fechadoEm: "2026-07-19T23:59:00"
+    },
+    {
+      data: "2026-07-20", campanha: "Pré-Seca",
+      horaIni: "18:44", horaFim: "22:30", duracao: "3h46", haHora: "26,25 ha/h",
+      tempIni: "24", tempFim: "21", umidIni: "57", umidFim: "59", ventoIni: "4", ventoFim: "5",
+      t70d: "40,99", t70a: "57,9", totalDia: 98.89,
+      fazendas: [{nome:"Sto Antonio", area:"98,89"}],
+      fazendasTexto: "Sto Antonio",
+      obs: ["Paramos as 22:30 hrs"],
+      timeline: [{tipo:"manutencao", hora:"21:45", texto:"Gerador DJI do drone Daniel parou de funcionar"}],
+      fechadoEm: "2026-07-20T23:59:00"
+    },
+    {
+      data: "2026-07-23", campanha: "Pré-Seca",
+      horaIni: "17:25", horaFim: "18:35", duracao: "1h10", haHora: "52,71 ha/h",
+      tempIni: "21", tempFim: "20", umidIni: "73", umidFim: "79", ventoIni: "6", ventoFim: "6",
+      t70d: "25,91", t70a: "35,58", totalDia: 61.49,
+      fazendas: [{nome:"São João", area:"35,76"}, {nome:"Sto Antonio", area:"25,73"}],
+      fazendasTexto: "São João, Sto Antonio",
+      obs: ["FN 67 Concluído"],
+      timeline: [{tipo:"fim", hora:"18:35", texto:"Aplicações suspensas por condições climáticas — radar indicando aproximação de chuva"}],
+      fechadoEm: "2026-07-23T23:59:00"
+    }
+  ];
+
+  function $(id){ return document.getElementById(id); }
+
+  function num(v){
+    var s = String(v === null || v === undefined ? "" : v).trim();
+    if (!s) return 0;
+    if (s.indexOf(",") > -1){
+      // padrão brasileiro: ponto = milhar, vírgula = decimal (ex.: 1.234,5)
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else if (/^\d{1,3}(\.\d{3})+$/.test(s)){
+      // apenas pontos em grupos de 3: milhar (ex.: 2.288 -> 2288)
+      s = s.replace(/\./g, "");
+    }
+    // caso contrário, ponto único é tratado como decimal (ex.: 18.6)
+    var n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function minutos(hhmm){
+    if (!hhmm || hhmm.indexOf(":") === -1) return null;
+    var p = hhmm.split(":");
+    var h = parseInt(p[0], 10), m = parseInt(p[1], 10);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
+  }
+
+  /* ---------- Animação de números ---------- */
+  function animaValor(el, alvo, un, decimais){
+    var sufixo = un ? ' <span class="un">' + un + '</span>' : '';
+    var f = (decimais === undefined)
+      ? fmt
+      : new Intl.NumberFormat("pt-BR", {maximumFractionDigits: decimais});
+    if (reduzMotion){
+      el._v = alvo;
+      el.innerHTML = f.format(alvo) + sufixo;
+      return;
+    }
+    var de = (typeof el._v === "number") ? el._v : 0;
+    if (de === alvo){
+      el.innerHTML = f.format(alvo) + sufixo;
+      return;
+    }
+    if (el._raf) cancelAnimationFrame(el._raf);
+    var t0 = null, dur = 450;
+    function passo(t){
+      if (t0 === null) t0 = t;
+      var p = Math.min(1, (t - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      var atual = de + (alvo - de) * e;
+      el.innerHTML = f.format(atual) + sufixo;
+      if (p < 1){ el._raf = requestAnimationFrame(passo); }
+      else { el._v = alvo; el._raf = null; }
+    }
+    el._raf = requestAnimationFrame(passo);
+  }
+
+  function animaPct(el, alvo){
+    if (reduzMotion){ el._v = alvo; el.textContent = Math.round(alvo) + "%"; return; }
+    var de = (typeof el._v === "number") ? el._v : 0;
+    if (de === alvo){ el.textContent = Math.round(alvo) + "%"; return; }
+    if (el._raf) cancelAnimationFrame(el._raf);
+    var t0 = null, dur = 700;
+    function passo(t){
+      if (t0 === null) t0 = t;
+      var p = Math.min(1, (t - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(de + (alvo - de) * e) + "%";
+      if (p < 1){ el._raf = requestAnimationFrame(passo); }
+      else { el._v = alvo; el._raf = null; }
+    }
+    el._raf = requestAnimationFrame(passo);
+  }
+
+  /* ---------- Cálculos ---------- */
+  function calcular(){
+    var d = num(estado.t70d), a = num(estado.t70a);
+    var totalDia = d + a;
+
+    atualizaTotalFazendas();
+
+    animaValor($("totalAeronaves"), totalDia, "ha");
+    animaValor($("aplicacaoDia"),  totalDia, "ha");
+
+    // duração e produtividade
+    var mi = minutos(estado.horaIni), mf = minutos(estado.horaFim);
+    if (mi !== null && mf !== null){
+      var dur = mf - mi;
+      if (dur < 0) dur += 24 * 60; // virada de dia
+      var h = Math.floor(dur / 60), m = dur % 60;
+      $("duracao").textContent = h + "h" + (m < 10 ? "0" : "") + m;
+      if (dur > 0 && totalDia > 0){
+        animaValor($("haHora"), totalDia / (dur / 60), "ha/h", 2);
+      } else {
+        $("haHora").textContent = "—"; $("haHora")._v = 0;
+      }
+    } else {
+      $("duracao").textContent = "—";
+      $("haHora").textContent = "—"; $("haHora")._v = 0;
+    }
+
+    // progresso da campanha — dias fechados + o dia em andamento (atualiza ao digitar)
+    var fechado = acumuladoCampanha();
+    var acum = fechado + totalDia;          // inclui o dia atual, mesmo sem fechar
+    var meta = num(estado.meta);
+    var pct = 0;
+    if (meta > 0) pct = Math.max(0, Math.min(100, (acum / meta) * 100));
+    animaValor($("acumulado"), acum, "ha");
+    animaPct($("pct"), pct);
+    $("arco").setAttribute("stroke-dashoffset", String(CIRC * (1 - pct / 100)));
+    $("legConcluido").textContent = fmt.format(acum) + " ha";
+    $("legRestante").textContent  = fmt.format(Math.max(0, meta - acum)) + " ha";
+
+    var nFech = estado.diasFechados.length;
+    $("diasCount").textContent = totalDia > 0 ? (nFech + 1) + "*" : String(nFech);
+    if (totalDia > 0){
+      $("acumSub").textContent = nFech
+        ? nFech + " dia" + (nFech > 1 ? "s" : "") + " + dia atual (a fechar)"
+        : "Dia atual (a fechar)";
+    } else {
+      $("acumSub").textContent = nFech
+        ? "Soma de " + nFech + " dia" + (nFech > 1 ? "s" : "")
+        : "Soma dos dias fechados";
+    }
+
+    // painéis do rodapé abertos acompanham os dados
+    if ($("painelTabela").classList.contains("aberto"))      renderTabela();
+    if ($("painelHistorico").classList.contains("aberto"))   renderHistorico();
+    if ($("painelGraficos").classList.contains("aberto"))    renderGraficos();
+    if ($("painelRelatorios").classList.contains("aberto"))  renderRelatorio();
+  }
+
+  /* ---------- Campanha ---------- */
+  function areaDoDia(){
+    return num(estado.t70d) + num(estado.t70a);
+  }
+  function acumuladoCampanha(){
+    var t = 0;
+    estado.diasFechados.forEach(function(dia){ t += (dia.totalDia || 0); });
+    return t;
+  }
+  // acumulado exibido na campanha: dias fechados + o dia que está sendo lançado
+  function acumuladoTotal(){
+    return acumuladoCampanha() + areaDoDia();
+  }
+
+  /* ---------- Sequência das fazendas ---------- */
+  function seqDe(nome){
+    if (!estado.seqDados[nome]) estado.seqDados[nome] = {aplicado: "", concluida: false};
+    return estado.seqDados[nome];
+  }
+
+  // soma, por fazenda, tudo que já foi aplicado nos dias fechados + no dia atual
+  function aplicadoPorFazendaNoHistorico(){
+    var mapa = {};
+    function somar(nome, area){
+      if (!nome) return;
+      mapa[nome] = (mapa[nome] || 0) + num(area);
+    }
+    estado.diasFechados.forEach(function(dia){
+      (dia.fazendas || []).forEach(function(f){ somar(f.nome, f.area); });
+    });
+    estado.fazendas.forEach(function(f){ somar(f.nome, f.area); });
+    return mapa;
+  }
+
+  // separa a sequência em: concluídas, em andamento e a seguir
+  function classificarSequencia(){
+    var g = {concluidas: [], andamento: [], aSeguir: []};
+    CATALOGO_FAZENDAS.forEach(function(c){
+      var d = seqDe(c.nome);
+      var ap = num(d.aplicado);
+      var item = {seq: c.seq, fn: c.fn, nome: c.nome, area: c.area, aplicado: ap, saldo: Math.max(0, c.area - ap)};
+      if (d.concluida || (ap > 0 && ap >= c.area - 0.005)) g.concluidas.push(item);
+      else if (ap > 0) g.andamento.push(item);
+      else g.aSeguir.push(item);
+    });
+    return g;
+  }
+
+  function renderGruposSeq(){
+    var g = classificarSequencia();
+
+    function coluna(titulo, itens, classeCor, modo){
+      var totalHa = 0;
+      itens.forEach(function(i){
+        totalHa += (modo === "concluida" ? i.aplicado : (modo === "andamento" ? i.saldo : i.area));
+      });
+      var rotuloTotal = modo === "concluida" ? "Aplicado" : (modo === "andamento" ? "Falta" : "A aplicar");
+
+      var h = '<div class="gr-col">' +
+        '<div class="gr-topo ' + classeCor + '">' +
+          '<span class="gr-tit">' + titulo + '</span>' +
+          '<span class="gr-qtd">' + itens.length + '</span>' +
+        '</div>';
+
+      if (!itens.length){
+        h += '<div class="gr-vazia">Nenhuma fazenda neste grupo.</div>';
+      } else {
+        h += '<ul class="gr-lista">';
+        itens.forEach(function(i, idx){
+          // no grupo "a seguir", a primeira é a próxima da fila
+          var proxima = (modo === "aSeguir" && idx === 0);
+          var valor = modo === "concluida" ? i.aplicado : (modo === "andamento" ? i.saldo : i.area);
+          h += '<li class="' + (proxima ? "proxima" : "") + '">' +
+            '<span class="gr-tag">' + (proxima ? "PRÓXIMA · S" + i.seq : "S" + i.seq) + '</span>' +
+            '<span class="gr-nome">' + i.nome + '</span>' +
+            '<span class="gr-ha">' + fmt2.format(valor) + ' ha</span>' +
+          '</li>';
+        });
+        h += '</ul>';
+      }
+
+      h += '<div class="gr-rodape"><span>' + rotuloTotal + '</span><span>' + fmt2.format(totalHa) + ' ha</span></div>';
+      h += '</div>';
+      return h;
+    }
+
+    $("seqGrupos").innerHTML =
+      coluna("Concluídas", g.concluidas, "gr-verde", "concluida") +
+      coluna("Em andamento", g.andamento, "gr-azul", "andamento") +
+      coluna("A seguir", g.aSeguir, "gr-cinza", "aSeguir");
+  }
+
+  function renderSequencia(){
+    var corpo = $("seqCorpo");
+    corpo.innerHTML = "";
+    var busca = ($("seqBusca").value || "").trim().toLowerCase();
+
+    var totArea = 0, totAplic = 0, nConcl = 0, nAnd = 0, visiveis = 0;
+
+    CATALOGO_FAZENDAS.forEach(function(c){
+      var d = seqDe(c.nome);
+      var aplicado = num(d.aplicado);
+      var saldo = Math.max(0, c.area - aplicado);
+      var pct = c.area > 0 ? Math.min(100, aplicado / c.area * 100) : 0;
+      var concluida = d.concluida || (aplicado > 0 && aplicado >= c.area - 0.005);
+
+      // totais consideram todas as fazendas, não só as filtradas
+      totArea += c.area; totAplic += aplicado;
+      if (concluida) nConcl++;
+      else if (aplicado > 0) nAnd++;
+
+      // filtro de busca
+      if (busca && c.nome.toLowerCase().indexOf(busca) === -1 && c.fn.indexOf(busca) === -1) return;
+      visiveis++;
+
+      var tr = document.createElement("tr");
+      if (concluida) tr.className = "seq-concluida";
+
+      function cel(html, classe){
+        var td = document.createElement("td");
+        if (classe) td.className = classe;
+        if (typeof html === "string") td.innerHTML = html; else td.appendChild(html);
+        tr.appendChild(td);
+        return td;
+      }
+
+      cel('<span class="seq-num">S' + c.seq + '</span>');
+      cel('<span class="seq-fn">' + c.fn + '</span>');
+      cel('<span class="seq-nome">' + c.nome + '</span>');
+      cel(fmt2.format(c.area), "num seq-area");
+
+      // campo editável de aplicado
+      var tdAp = document.createElement("td");
+      tdAp.className = "num";
+      var inp = document.createElement("input");
+      inp.type = "text";
+      inp.className = "seq-aplic";
+      inp.setAttribute("inputmode", "decimal");
+      inp.placeholder = "0,00";
+      inp.value = d.aplicado || "";
+      inp.setAttribute("aria-label", "Aplicado em " + c.nome);
+      inp.addEventListener("input", function(){
+        d.aplicado = this.value;
+        atualizaLinhaSeq(tr, c, d);
+        atualizaTotaisSeq();
+        salvar();
+      });
+      tdAp.appendChild(inp);
+      tr.appendChild(tdAp);
+
+      cel(fmt2.format(saldo), "num seq-saldo");
+      cel('<span class="chip-st chip-ok">OK</span>');
+      cel('<span class="chip-st ' + (!concluida && aplicado > 0 ? "chip-ok" : "chip-off") + '">' + (!concluida && aplicado > 0 ? "OK" : "—") + '</span>');
+      cel('<span class="chip-st ' + (concluida ? "chip-ok" : "chip-off") + '">' + (concluida ? "OK" : "—") + '</span>');
+      cel('<div class="seq-prog"><div class="trilha"><div class="fill ' + (concluida ? "f-ok" : "f-and") +
+          '" style="width:' + pct.toFixed(1) + '%;"></div></div><span class="pctxt">' + Math.round(pct) + '%</span></div>');
+
+      var tdAc = document.createElement("td");
+      tdAc.className = "col-acao";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn-concluir" + (d.concluida ? " ativo" : "");
+      btn.textContent = d.concluida ? "Concluída" : "Concluir";
+      btn.addEventListener("click", function(){
+        d.concluida = !d.concluida;
+        renderSequencia();
+        salvar();
+      });
+      tdAc.appendChild(btn);
+      tr.appendChild(tdAc);
+
+      corpo.appendChild(tr);
+    });
+
+    if (!visiveis){
+      var trV = document.createElement("tr");
+      var tdV = document.createElement("td");
+      tdV.className = "seq-vazio";
+      tdV.setAttribute("colspan", "11");
+      tdV.textContent = "Nenhuma fazenda encontrada para \"" + $("seqBusca").value + "\".";
+      trV.appendChild(tdV);
+      corpo.appendChild(trV);
+    }
+
+    montaTotaisSeq(totArea, totAplic, nConcl, nAnd);
+    renderGruposSeq();
+  }
+
+  // atualiza só a linha editada (sem redesenhar a tabela, para não perder o foco)
+  function atualizaLinhaSeq(tr, c, d){
+    var aplicado = num(d.aplicado);
+    var saldo = Math.max(0, c.area - aplicado);
+    var pct = c.area > 0 ? Math.min(100, aplicado / c.area * 100) : 0;
+    var concluida = d.concluida || (aplicado > 0 && aplicado >= c.area - 0.005);
+
+    var tds = tr.getElementsByTagName("td");
+    tds[5].textContent = fmt2.format(saldo);
+    tds[7].innerHTML = '<span class="chip-st ' + (!concluida && aplicado > 0 ? "chip-ok" : "chip-off") + '">' + (!concluida && aplicado > 0 ? "OK" : "—") + '</span>';
+    tds[8].innerHTML = '<span class="chip-st ' + (concluida ? "chip-ok" : "chip-off") + '">' + (concluida ? "OK" : "—") + '</span>';
+    var fill = tr.querySelector(".seq-prog .fill");
+    var pctxt = tr.querySelector(".seq-prog .pctxt");
+    if (fill){
+      fill.style.width = pct.toFixed(1) + "%";
+      fill.className = "fill " + (concluida ? "f-ok" : "f-and");
+    }
+    if (pctxt) pctxt.textContent = Math.round(pct) + "%";
+    tr.className = concluida ? "seq-concluida" : "";
+  }
+
+  function atualizaTotaisSeq(){
+    var totArea = 0, totAplic = 0, nConcl = 0, nAnd = 0;
+    CATALOGO_FAZENDAS.forEach(function(c){
+      var d = seqDe(c.nome);
+      var ap = num(d.aplicado);
+      totArea += c.area; totAplic += ap;
+      var concluida = d.concluida || (ap > 0 && ap >= c.area - 0.005);
+      if (concluida) nConcl++; else if (ap > 0) nAnd++;
+    });
+    montaTotaisSeq(totArea, totAplic, nConcl, nAnd);
+    renderGruposSeq();
+  }
+
+  function montaTotaisSeq(totArea, totAplic, nConcl, nAnd){
+    var tabela = $("seqTabela");
+    var tf = tabela.querySelector("tfoot");
+    if (tf) tf.remove();
+    var pct = totArea > 0 ? (totAplic / totArea * 100) : 0;
+    tf = document.createElement("tfoot");
+    tf.innerHTML = "<tr>" +
+      "<td colspan='3'>TOTAL · " + CATALOGO_FAZENDAS.length + " fazendas</td>" +
+      "<td class='num'>" + fmt2.format(totArea) + "</td>" +
+      "<td class='num'>" + fmt2.format(totAplic) + "</td>" +
+      "<td class='num'>" + fmt2.format(Math.max(0, totArea - totAplic)) + "</td>" +
+      "<td colspan='3'>" + nConcl + " concluída" + (nConcl === 1 ? "" : "s") + " · " + nAnd + " em andamento</td>" +
+      "<td>" + pct.toFixed(1).replace(".", ",") + "%</td>" +
+      "<td class='col-acao'></td>" +
+      "</tr>";
+    tabela.appendChild(tf);
+  }
+
+  /* ---------- Fazendas ---------- */
+  function totalFazendas(){
+    var t = 0;
+    estado.fazendas.forEach(function(f){ t += num(f.area); });
+    return t;
+  }
+
+  function textoFazendas(){
+    if (!estado.fazendas.length) return "—";
+    return estado.fazendas.map(function(f){ return f.nome; }).join(", ");
+  }
+
+  function popularSelect(){
+    var sel = $("fzSelect");
+    var jaAdicionadas = {};
+    estado.fazendas.forEach(function(f){ jaAdicionadas[f.nome.toLowerCase()] = true; });
+
+    sel.innerHTML = '<option value="">Selecione uma fazenda…</option>';
+    CATALOGO_FAZENDAS.forEach(function(c){
+      if (jaAdicionadas[c.nome.toLowerCase()]) return; // não repetir já adicionadas
+      var op = document.createElement("option");
+      op.value = c.nome;
+      op.textContent = c.nome;
+      sel.appendChild(op);
+    });
+    var outra = document.createElement("option");
+    outra.value = "__outra__";
+    outra.textContent = "➕ Outra fazenda (digitar)…";
+    sel.appendChild(outra);
+  }
+
+  function renderFazendas(){
+    var grade = $("fzGrade");
+    grade.innerHTML = "";
+
+    estado.fazendas.forEach(function(f, idx){
+      var item = document.createElement("div");
+      item.className = "fz-item";
+
+      var topo = document.createElement("div");
+      topo.className = "fz-topo";
+
+      var nome = document.createElement("span");
+      nome.className = "fz-nome";
+      nome.textContent = f.nome;
+      topo.appendChild(nome);
+
+      var rem = document.createElement("button");
+      rem.className = "fz-remover";
+      rem.type = "button";
+      rem.innerHTML = "&times;";
+      rem.setAttribute("aria-label", "Remover " + f.nome);
+      rem.addEventListener("click", function(){
+        estado.fazendas.splice(idx, 1);
+        popularSelect();
+        renderFazendas();
+        calcular();
+        salvar();
+      });
+      topo.appendChild(rem);
+
+      var area = document.createElement("div");
+      area.className = "fz-area";
+      var lab = document.createElement("label");
+      lab.textContent = "Área";
+      var inp = document.createElement("input");
+      inp.type = "text";
+      inp.setAttribute("inputmode", "decimal");
+      inp.placeholder = "0";
+      inp.value = f.area || "";
+      inp.setAttribute("aria-label", "Área aplicada em " + f.nome + " (ha)");
+      inp.addEventListener("input", function(){
+        f.area = this.value;
+        atualizaTotalFazendas();
+        calcular();
+        salvar();
+      });
+      var un = document.createElement("span");
+      un.className = "un-fixa";
+      un.textContent = "ha";
+      area.appendChild(lab);
+      area.appendChild(inp);
+      area.appendChild(un);
+
+      item.appendChild(topo);
+      item.appendChild(area);
+      grade.appendChild(item);
+    });
+
+    $("fzVazio").style.display = estado.fazendas.length ? "none" : "block";
+    atualizaTotalFazendas();
+  }
+
+  function atualizaTotalFazendas(){
+    var n = estado.fazendas.length;
+    var total = totalFazendas();
+    var caixa = $("fzTotalCaixa");
+    if (n){
+      caixa.style.display = "flex";
+      $("fzTotal").textContent = fmt.format(total) + " ha";
+    } else {
+      caixa.style.display = "none";
+    }
+    var resumo = $("fzResumo");
+    if (n === 0) resumo.textContent = "";
+    else if (n === 1) resumo.textContent = "1 fazenda adicionada";
+    else resumo.textContent = n + " fazendas adicionadas";
+  }
+
+  /* ---------- Observações ---------- */
+  function renderObs(){
+    var ul = $("obsLista");
+    ul.innerHTML = "";
+    estado.obs.forEach(function(o, i){
+      var li = document.createElement("li");
+
+      var texto = document.createElement("span");
+      texto.className = "texto";
+      texto.textContent = o.texto;
+
+      var btn = document.createElement("button");
+      btn.className = "btn-perigo";
+      btn.type = "button";
+      btn.textContent = "Excluir";
+      btn.addEventListener("click", function(){
+        estado.obs.splice(i, 1);
+        renderObs();
+        salvar();
+      });
+
+      li.appendChild(texto);
+      li.appendChild(btn);
+      ul.appendChild(li);
+    });
+    $("obsVazio").style.display = estado.obs.length ? "none" : "block";
+  }
+
+  /* ---------- Linha do tempo ---------- */
+  var TL_TIPOS = {
+    inicio:     {rotulo:"Início da aplicação",  cor:"#0d9463",
+      svg:'<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.8v14.4a.8.8 0 0 0 1.22.68l11.3-7.2a.8.8 0 0 0 0-1.36L8.22 4.12A.8.8 0 0 0 7 4.8z"/></svg>'},
+    pausa:      {rotulo:"Pausa",                cor:"#ea580c",
+      svg:'<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1.3"/><rect x="14" y="4.5" width="4" height="15" rx="1.3"/></svg>'},
+    retorno:    {rotulo:"Retomada da aplicação", cor:"#0d9463",
+      svg:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>'},
+    manutencao: {rotulo:"Manutenção",           cor:"#0e5a6d",
+      svg:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14.5 12l-2.5-2.5z"/></svg>'},
+    fim:        {rotulo:"Aplicação finalizada", cor:"#6d28d9",
+      svg:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'},
+    outro:      {rotulo:"Evento",               cor:"#5f6f80",
+      svg:'<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3.2"/></svg>'}
+  };
+
+  function renderTimeline(){
+    var caixa = $("timelineLista");
+    caixa.innerHTML = "";
+
+    // ordena cronologicamente
+    var ordenado = estado.timeline.slice().sort(function(x, y){
+      return (minutos(x.hora) || 0) - (minutos(y.hora) || 0);
+    });
+
+    ordenado.forEach(function(ev, i){
+      if (i > 0){
+        var seta = document.createElement("div");
+        seta.className = "tl-seta";
+        caixa.appendChild(seta);
+      }
+
+      var tipo = TL_TIPOS[ev.tipo] || TL_TIPOS.outro;
+
+      var item = document.createElement("div");
+      item.className = "tl-item";
+
+      var ponto = document.createElement("div");
+      ponto.className = "tl-ponto";
+      ponto.style.background = tipo.cor;
+      ponto.innerHTML = tipo.svg;
+
+      var hora = document.createElement("div");
+      hora.className = "tl-hora";
+      hora.textContent = ev.hora || "—";
+
+      var desc = document.createElement("div");
+      desc.className = "tl-desc";
+      desc.textContent = ev.texto || tipo.rotulo;
+
+      var x = document.createElement("button");
+      x.className = "tl-x";
+      x.type = "button";
+      x.textContent = "remover";
+      x.setAttribute("aria-label", "Remover evento " + (ev.texto || tipo.rotulo));
+      x.addEventListener("click", function(){
+        var idx = estado.timeline.indexOf(ev);
+        if (idx > -1) estado.timeline.splice(idx, 1);
+        renderTimeline();
+        salvar();
+      });
+
+      item.appendChild(ponto);
+      item.appendChild(hora);
+      item.appendChild(desc);
+      item.appendChild(x);
+      caixa.appendChild(item);
+    });
+
+    $("timelineVazio").style.display = estado.timeline.length ? "none" : "block";
+  }
+
+  /* ---------- Painéis do rodapé ---------- */
+  function linhaTabela(rotulo, valor){
+    return "<tr><td>" + rotulo + '</td><td class="v">' + (valor || "—") + "</td></tr>";
+  }
+
+  function renderTabela(){
+    var d = num(estado.t70d), a = num(estado.t70a);
+    var totalDia = d + a;
+    var acum = acumuladoTotal(), meta = num(estado.meta);
+    var html = "";
+    html += linhaTabela("Data", estado.data);
+    html += linhaTabela("Campanha / Safra", estado.campanha);
+    html += linhaTabela("Fazendas", textoFazendas());
+    estado.fazendas.forEach(function(f){
+      html += linhaTabela("&nbsp;&nbsp;• " + f.nome, num(f.area) ? fmt.format(num(f.area)) + " ha" : "—");
+    });
+    if (estado.fazendas.length){
+      html += linhaTabela("Área total das fazendas", fmt.format(totalFazendas()) + " ha");
+    }
+    html += linhaTabela("Hora inicial", estado.horaIni);
+    html += linhaTabela("Hora final", estado.horaFim);
+    html += linhaTabela("Duração", $("duracao").textContent);
+    html += linhaTabela("Temperatura inicial", estado.tempIni ? estado.tempIni + " °C" : "");
+    html += linhaTabela("Temperatura final",  estado.tempFim ? estado.tempFim + " °C" : "");
+    html += linhaTabela("Umidade inicial", estado.umidIni ? estado.umidIni + " %" : "");
+    html += linhaTabela("Umidade final",  estado.umidFim ? estado.umidFim + " %" : "");
+    html += linhaTabela("Vento inicial", estado.ventoIni ? estado.ventoIni + " km/h" : "");
+    html += linhaTabela("Vento final",  estado.ventoFim ? estado.ventoFim + " km/h" : "");
+    html += linhaTabela("T70 D", d ? fmt.format(d) + " ha" : "");
+    html += linhaTabela("T70 A", a ? fmt.format(a) + " ha" : "");
+    html += linhaTabela("Aplicação do dia", fmt.format(totalDia) + " ha");
+    html += linhaTabela("Acumulado da campanha", fmt.format(acum) + " ha");
+    html += linhaTabela("Total da campanha", fmt.format(meta) + " ha");
+    html += linhaTabela("Dias de operação", String(estado.diasFechados.length));
+    html += linhaTabela("Progresso", meta > 0 ? Math.round(Math.min(100, acum / meta * 100)) + " %" : "");
+    $("tabelaCorpo").innerHTML = html;
+  }
+
+  function barraHTML(rotulo, valor, max, cor, unidade){
+    var pct = max > 0 ? Math.max(0, Math.min(100, valor / max * 100)) : 0;
+    return '<div class="gbar">' +
+      '<div class="gbar-rotulo">' + rotulo + '</div>' +
+      '<div class="gbar-trilha"><div class="gbar-fill" style="background:' + cor + ';" data-w="' + pct + '"></div></div>' +
+      '<div class="gbar-valor">' + fmt.format(valor) + ' ' + unidade + '</div>' +
+    '</div>';
+  }
+
+  function renderGraficos(){
+    var d = num(estado.t70d), a = num(estado.t70a);
+    var maxDia = Math.max(d, a, 1);
+    var acum = acumuladoTotal(), meta = num(estado.meta);
+
+    var html = "";
+    html += '<div class="gbar-grupo"><div class="gbar-titulo">Aplicação do dia por aeronave</div>';
+    html += barraHTML("T70 D", d, maxDia, "linear-gradient(90deg,#7c5cfc,#6d28d9)", "ha");
+    html += barraHTML("T70 A", a, maxDia, "linear-gradient(90deg,#2a7f96,#0e5a6d)", "ha");
+    html += '</div>';
+    html += '<div class="gbar-grupo"><div class="gbar-titulo">Progresso da campanha</div>';
+    html += barraHTML("Acumulado", acum, meta > 0 ? meta : Math.max(acum, 1), "linear-gradient(90deg,#25b380,#0d9463)", "ha");
+    html += '</div>';
+
+    // progresso por fazenda, na ordem da sequência
+    html += '<div class="gbar-grupo"><div class="gbar-titulo">Progresso por fazenda (sequência)</div>';
+    CATALOGO_FAZENDAS.forEach(function(c){
+      var dd = seqDe(c.nome);
+      var ap = num(dd.aplicado);
+      var concl = dd.concluida || (ap > 0 && ap >= c.area - 0.005);
+      var cor = concl ? "linear-gradient(90deg,#25b380,#0d9463)"
+                      : (ap > 0 ? "linear-gradient(90deg,#2a7f96,#0e5a6d)" : "linear-gradient(90deg,#d6dde6,#c3ccd8)");
+      html += barraHTML("S" + c.seq + " · " + c.nome, ap, c.area, cor, "de " + fmt2.format(c.area) + " ha");
+    });
+    html += '</div>';
+
+    $("graficoBarras").innerHTML = html;
+
+    // dispara a transição de largura
+    requestAnimationFrame(function(){
+      Array.prototype.forEach.call(document.querySelectorAll("#graficoBarras .gbar-fill"), function(el){
+        el.style.width = el.getAttribute("data-w") + "%";
+      });
+    });
+  }
+
+  function renderRelatorio(){
+    var d = num(estado.t70d), a = num(estado.t70a);
+    var totalDia = d + a;
+    var acum = acumuladoTotal(), meta = num(estado.meta);
+    var pct = meta > 0 ? Math.round(Math.min(100, acum / meta * 100)) : 0;
+
+    var L = [];
+    L.push("RELATÓRIO DIÁRIO — APLICAÇÃO COM DRONE");
+    L.push("========================================");
+    L.push("Data: " + (estado.data || "—") + "    Campanha: " + (estado.campanha || "—"));
+    L.push("Fazendas: " + textoFazendas());
+    estado.fazendas.forEach(function(f){
+      L.push("   - " + f.nome + ": " + (num(f.area) ? fmt.format(num(f.area)) + " ha" : "—"));
+    });
+    if (estado.fazendas.length){
+      L.push("   Área total das fazendas: " + fmt.format(totalFazendas()) + " ha");
+    }
+    L.push("");
+    L.push("OPERAÇÃO");
+    L.push("  Hora inicial: " + (estado.horaIni || "—") + "    Hora final: " + (estado.horaFim || "—") + "    Duração: " + $("duracao").textContent);
+    L.push("  T70 D: " + fmt.format(d) + " ha    T70 A: " + fmt.format(a) + " ha");
+    L.push("  Aplicação do dia: " + fmt.format(totalDia) + " ha    Produtividade: " + ($("haHora").textContent.replace(/\s+/g," ") || "—"));
+    L.push("");
+    L.push("CLIMA");
+    L.push("  Temperatura: " + (estado.tempIni || "—") + " °C → " + (estado.tempFim || "—") + " °C");
+    L.push("  Umidade:     " + (estado.umidIni || "—") + " % → " + (estado.umidFim || "—") + " %");
+    L.push("  Vento:       " + (estado.ventoIni || "—") + " km/h → " + (estado.ventoFim || "—") + " km/h");
+    L.push("");
+    L.push("CAMPANHA");
+    L.push("  Dias fechados: " + estado.diasFechados.length);
+    L.push("  Acumulado: " + fmt.format(acum) + " ha de " + fmt.format(meta) + " ha (" + pct + "%)");
+    L.push("  Restante:  " + fmt.format(Math.max(0, meta - acum)) + " ha");
+
+    if (estado.timeline.length){
+      L.push("");
+      L.push("LINHA DO TEMPO");
+      estado.timeline.slice().sort(function(x, y){
+        return (minutos(x.hora) || 0) - (minutos(y.hora) || 0);
+      }).forEach(function(ev){
+        var tipo = TL_TIPOS[ev.tipo] || TL_TIPOS.outro;
+        L.push("  " + (ev.hora || "—") + " — " + (ev.texto || tipo.rotulo));
+      });
+    }
+
+    if (estado.obs.length){
+      L.push("");
+      L.push("OBSERVAÇÕES");
+      estado.obs.forEach(function(o){
+        L.push("  • " + o.texto);
+      });
+    }
+
+    $("relatorioTexto").value = L.join("\n");
+  }
+
+  /* ---------- Histórico da campanha ---------- */
+  function renderHistorico(){
+    var meta = num(estado.meta);
+    var fechado = acumuladoCampanha();
+    var emAndamento = areaDoDia();
+    var acum = fechado + emAndamento;
+    var dias = estado.diasFechados.length;
+    var diasEfetivos = dias + (emAndamento > 0 ? 1 : 0);
+    var media = diasEfetivos ? acum / diasEfetivos : 0;
+
+    // cartões de resumo (incluem o dia atual ainda não fechado)
+    $("histResumo").innerHTML =
+      cardHist("Dias de operação", String(dias) + (emAndamento > 0 ? " +1*" : ""), "") +
+      cardHist("Área acumulada", fmt.format(acum), "ha") +
+      cardHist("Média por dia", fmt.format(media), "ha") +
+      cardHist("Restante da campanha", fmt.format(Math.max(0, meta - acum)), "ha");
+
+    // tabela de dias
+    var corpo = $("histCorpo");
+    corpo.innerHTML = "";
+    var somaD = 0, somaA = 0, somaT = 0;
+
+    estado.diasFechados.forEach(function(dia, i){
+      somaD += num(dia.t70d); somaA += num(dia.t70a); somaT += (dia.totalDia || 0);
+      var tr = document.createElement("tr");
+
+      function td(conteudo, classe){
+        var c = document.createElement("td");
+        if (classe) c.className = classe;
+        c.innerHTML = conteudo;
+        tr.appendChild(c);
+      }
+      td(String(i + 1));
+      td(dataBR(dia.data));
+      td(dia.horaIni || "—");
+      td(dia.horaFim || "—");
+      td(dia.duracao || "—");
+      td(dia.fazendasTexto || "—", "fz");
+      td(num(dia.t70d) ? fmt.format(num(dia.t70d)) : "—", "v");
+      td(num(dia.t70a) ? fmt.format(num(dia.t70a)) : "—", "v");
+      td(fmt.format(dia.totalDia || 0) + " ha", "v");
+
+      // célula do botão remover
+      var tdX = document.createElement("td");
+      var bx = document.createElement("button");
+      bx.className = "hist-del";
+      bx.type = "button";
+      bx.textContent = "excluir";
+      bx.setAttribute("aria-label", "Excluir dia " + dataBR(dia.data));
+      bx.addEventListener("click", function(){
+        if (!confirm("Excluir o dia " + dataBR(dia.data) + " do histórico?\nA área de " + fmt.format(dia.totalDia || 0) + " ha voltará a contar como restante.")) return;
+        var idx = estado.diasFechados.indexOf(dia);
+        if (idx > -1) estado.diasFechados.splice(idx, 1);
+        renderHistorico();
+        calcular();
+        salvar();
+      });
+      tdX.appendChild(bx);
+      tr.appendChild(tdX);
+      corpo.appendChild(tr);
+    });
+
+    // linha do dia em andamento (ainda não fechado)
+    if (emAndamento > 0){
+      var trA = document.createElement("tr");
+      trA.className = "linha-andamento";
+      function tdA(txt, classe){
+        var c = document.createElement("td");
+        if (classe) c.className = classe;
+        c.innerHTML = txt;
+        trA.appendChild(c);
+      }
+      tdA("*");
+      tdA(dataBR(estado.data));
+      tdA(estado.horaIni || "—");
+      tdA(estado.horaFim || "—");
+      tdA($("duracao").textContent || "—");
+      tdA(textoFazendas(), "fz");
+      tdA(num(estado.t70d) ? fmt.format(num(estado.t70d)) : "—", "v");
+      tdA(num(estado.t70a) ? fmt.format(num(estado.t70a)) : "—", "v");
+      tdA(fmt.format(emAndamento) + " ha", "v");
+      tdA("<span class='tag-andamento'>em andamento</span>");
+      corpo.appendChild(trA);
+    }
+
+    // rodapé de totais
+    var tf = $("histTabela").querySelector("tfoot");
+    if (tf) tf.remove();
+    if (dias || emAndamento > 0){
+      var tD = somaD + num(estado.t70d), tA = somaA + num(estado.t70a), tT = somaT + emAndamento;
+      var rotulo = dias + (emAndamento > 0 ? 1 : 0);
+      tf = document.createElement("tfoot");
+      tf.innerHTML = "<tr><td colspan='6'>TOTAL — " + rotulo + " dia" + (rotulo > 1 ? "s" : "") +
+        (emAndamento > 0 ? " (inclui o dia em andamento)" : "") + "</td>" +
+        "<td>" + fmt.format(tD) + "</td><td>" + fmt.format(tA) + "</td>" +
+        "<td>" + fmt.format(tT) + " ha</td><td></td></tr>";
+      $("histTabela").appendChild(tf);
+    }
+
+    var temLinhas = dias || emAndamento > 0;
+    $("histVazio").style.display = temLinhas ? "none" : "block";
+    $("histTabela").style.display = temLinhas ? "" : "none";
+  }
+
+  function cardHist(rot, val, un){
+    return '<div class="hist-card"><div class="h-rot">' + rot + '</div>' +
+      '<div class="h-val">' + val + (un ? ' <span class="un">' + un + '</span>' : '') + '</div></div>';
+  }
+
+  function textoHistorico(){
+    var meta = num(estado.meta), acum = acumuladoTotal(), dias = estado.diasFechados.length;
+    var emAndamento = areaDoDia();
+    var L = [];
+    L.push("HISTÓRICO DA CAMPANHA — " + (estado.campanha || "—"));
+    L.push("========================================");
+    L.push("Total da campanha: " + fmt.format(meta) + " ha");
+    L.push("Acumulado: " + fmt.format(acum) + " ha    Restante: " + fmt.format(Math.max(0, meta - acum)) + " ha");
+    L.push("Dias de operação: " + dias + (emAndamento > 0 ? " (+ dia atual em andamento)" : ""));
+    L.push("");
+    estado.diasFechados.forEach(function(dia, i){
+      L.push((i + 1) + ") " + dataBR(dia.data) + " — " + fmt.format(dia.totalDia || 0) + " ha" +
+        (dia.duracao ? " (" + dia.duracao + ")" : "") +
+        (dia.fazendasTexto && dia.fazendasTexto !== "—" ? " — " + dia.fazendasTexto : ""));
+    });
+    if (emAndamento > 0){
+      L.push("*) " + dataBR(estado.data) + " — " + fmt.format(emAndamento) + " ha (EM ANDAMENTO, ainda não fechado)" +
+        (textoFazendas() !== "—" ? " — " + textoFazendas() : ""));
+    }
+    return L.join("\n");
+  }
+
+  var PAINEIS = {
+    navTabela:     {painel: "painelTabela",     render: renderTabela},
+    navSequencia:  {painel: "painelSequencia",  render: renderSequencia},
+    navHistorico:  {painel: "painelHistorico",  render: renderHistorico},
+    navGraficos:   {painel: "painelGraficos",   render: renderGraficos},
+    navRelatorios: {painel: "painelRelatorios", render: renderRelatorio},
+    navConfig:     {painel: "painelConfig",     render: null}
+  };
+
+  Object.keys(PAINEIS).forEach(function(idBtn){
+    $(idBtn).addEventListener("click", function(){
+      var cfg = PAINEIS[idBtn];
+      var painel = $(cfg.painel);
+      var jaAberto = painel.classList.contains("aberto");
+
+      // fecha todos
+      Object.keys(PAINEIS).forEach(function(k){
+        $(PAINEIS[k].painel).classList.remove("aberto");
+        $(k).setAttribute("aria-expanded", "false");
+      });
+
+      if (!jaAberto){
+        painel.classList.add("aberto");
+        this.setAttribute("aria-expanded", "true");
+        if (cfg.render) cfg.render();
+        painel.scrollIntoView({behavior: reduzMotion ? "auto" : "smooth", block: "nearest"});
+      }
+    });
+  });
+
+  /* ---------- Persistência ---------- */
+  var salvarTimer = null;
+  function salvar(){
+    clearTimeout(salvarTimer);
+    salvarTimer = setTimeout(function(){
+      if (!window.storage) return;
+      window.storage.set(CHAVE, JSON.stringify(estado)).then(function(){
+        var av = $("avisoSalvo");
+        av.textContent = "✓ Dados salvos";
+        setTimeout(function(){ av.textContent = ""; }, 2500);
+      }).catch(function(){ /* salvar é melhor-esforço */ });
+    }, 500);
+  }
+
+  function aplicarEstadoNosCampos(){
+    ["data","campanha","horaIni","horaFim","tempIni","tempFim","umidIni","umidFim",
+     "ventoIni","ventoFim","t70d","t70a","meta"].forEach(function(id){
+      $(id).value = estado[id] || "";
+    });
+  }
+
+  function carregar(){
+    if (!window.storage){ semearDiasIniciais(); iniciar(); return; }
+    window.storage.get(CHAVE).then(function(r){
+      if (r && r.value){
+        try {
+          var s = JSON.parse(r.value);
+          Object.keys(estado).forEach(function(k){
+            if (s[k] !== undefined) estado[k] = s[k];
+          });
+          if (!Array.isArray(estado.obs)) estado.obs = [];
+          if (!Array.isArray(estado.timeline)) estado.timeline = [];
+          if (!Array.isArray(estado.fazendas)) estado.fazendas = [];
+          if (!Array.isArray(estado.diasFechados)) estado.diasFechados = [];
+          if (!estado.seqDados || typeof estado.seqDados !== "object" || Array.isArray(estado.seqDados)) estado.seqDados = {};
+          // migração: acumulado antigo (input manual) vira um registro no histórico
+          if (s.acumulado !== undefined && num(s.acumulado) > 0 && !estado.diasFechados.length){
+            estado.diasFechados.push({
+              data: s.data || "",
+              totalDia: num(s.acumulado),
+              fazendasTexto: "Acumulado anterior",
+              duracao: "", horaIni: "", horaFim: "",
+              t70d: "", t70a: "", obs: [], timeline: [],
+              fechadoEm: new Date().toISOString()
+            });
+          }
+        } catch(e){ /* dados inválidos: começa limpo */ }
+      }
+      // pré-carrega os dias já realizados quando o histórico ainda está vazio
+      // (primeira abertura, ou dados salvos de antes do recurso de histórico)
+      if (!estado.diasFechados.length){
+        semearDiasIniciais();
+        salvar();
+      }
+      migrarNomesFazendas();
+      migrarFazendas();
+      iniciar();
+    }).catch(function(){ semearDiasIniciais(); iniciar(); });
+  }
+
+  // aplica os renomes de fazendas em tudo que já estiver salvo
+  function migrarNomesFazendas(){
+    function novo(n){ return RENOMES[n] || n; }
+
+    // dados da sequência (chaveados por nome)
+    var seqNovo = {};
+    Object.keys(estado.seqDados || {}).forEach(function(k){
+      var n = novo(k);
+      if (seqNovo[n]){
+        // junta se os dois nomes existirem
+        if (!num(seqNovo[n].aplicado) && num(estado.seqDados[k].aplicado)) seqNovo[n].aplicado = estado.seqDados[k].aplicado;
+        seqNovo[n].concluida = seqNovo[n].concluida || estado.seqDados[k].concluida;
+      } else {
+        seqNovo[n] = estado.seqDados[k];
+      }
+    });
+    estado.seqDados = seqNovo;
+
+    // fazendas do dia atual
+    estado.fazendas.forEach(function(f){ f.nome = novo(f.nome); });
+
+    // fazendas dentro dos dias já fechados
+    estado.diasFechados.forEach(function(dia){
+      (dia.fazendas || []).forEach(function(f){ f.nome = novo(f.nome); });
+      if (dia.fazendasTexto){
+        Object.keys(RENOMES).forEach(function(antigo){
+          dia.fazendasTexto = dia.fazendasTexto.split(antigo).join(RENOMES[antigo]);
+        });
+      }
+    });
+  }
+
+  // pré-carrega os dias já realizados, sem duplicar datas que já existam no histórico
+  function semearDiasIniciais(){
+    if (!DIAS_INICIAIS || !DIAS_INICIAIS.length) return;
+    var datasExistentes = {};
+    estado.diasFechados.forEach(function(d){ datasExistentes[d.data] = true; });
+    DIAS_INICIAIS.forEach(function(dia){
+      if (!datasExistentes[dia.data]){
+        estado.diasFechados.push(dia);
+        datasExistentes[dia.data] = true;
+      }
+    });
+    // mantém em ordem cronológica
+    estado.diasFechados.sort(function(a, b){
+      return (a.data || "").localeCompare(b.data || "");
+    });
+    if (CAMPANHA_INICIAL && !estado.campanha) estado.campanha = CAMPANHA_INICIAL;
+
+    // preenche a sequência com o que já foi aplicado, se ainda estiver zerada
+    var temSeq = Object.keys(estado.seqDados || {}).some(function(k){
+      return num(estado.seqDados[k].aplicado) > 0 || estado.seqDados[k].concluida;
+    });
+    if (!temSeq){
+      var mapa = aplicadoPorFazendaNoHistorico();
+      Object.keys(mapa).forEach(function(n){
+        seqDe(n).aplicado = fmt2.format(mapa[n]);
+      });
+      // fazendas declaradas concluídas nas observações do dia
+      CONCLUIDAS_INICIAIS.forEach(function(n){ seqDe(n).concluida = true; });
+    }
+  }
+
+  // migra estado salvo do modelo antigo (catálogo com "marcada") para o novo (só adicionadas)
+  function migrarFazendas(){
+    if (!Array.isArray(estado.fazendas)) { estado.fazendas = []; return; }
+    // se algum item tiver a chave "marcada", veio do modelo antigo
+    var modeloAntigo = estado.fazendas.some(function(f){ return f.hasOwnProperty("marcada"); });
+    if (modeloAntigo){
+      estado.fazendas = estado.fazendas
+        .filter(function(f){ return f.marcada; })
+        .map(function(f){ return {nome:f.nome, fn:f.fn||"", area:f.area||""}; });
+    }
+  }
+
+  function iniciar(){
+    if (!estado.data){
+      var hoje = new Date();
+      estado.data = hoje.getFullYear() + "-" +
+        String(hoje.getMonth() + 1).padStart(2, "0") + "-" +
+        String(hoje.getDate()).padStart(2, "0");
+    }
+    aplicarEstadoNosCampos();
+    popularSelect();
+    renderFazendas();
+    renderObs();
+    renderTimeline();
+    // pequeno atraso para o donut e os números animarem na entrada
+    requestAnimationFrame(function(){ requestAnimationFrame(calcular); });
+  }
+
+  /* ---------- Eventos ---------- */
+  ["data","campanha","horaIni","horaFim","tempIni","tempFim","umidIni","umidFim",
+   "ventoIni","ventoFim","t70d","t70a","meta"].forEach(function(id){
+    $(id).addEventListener("input", function(){
+      estado[id] = this.value;
+      calcular();
+      salvar();
+    });
+  });
+
+  // ao escolher "Outra fazenda", revela o campo de digitar
+  $("fzSelect").addEventListener("change", function(){
+    var digitar = this.value === "__outra__";
+    $("fzNova").style.display = digitar ? "block" : "none";
+    if (digitar) $("fzNova").focus();
+  });
+
+  function adicionarFazenda(){
+    var sel = $("fzSelect");
+    var val = sel.value;
+    var nome = "", fn = "";
+
+    if (val === "__outra__"){
+      nome = $("fzNova").value.trim();
+      if (!nome){ $("fzNova").focus(); return; }
+    } else if (val){
+      nome = val;
+      var cat = CATALOGO_FAZENDAS.filter(function(c){ return c.nome === val; })[0];
+      if (cat) fn = cat.fn;
+    } else {
+      return; // nada selecionado
+    }
+
+    var existe = estado.fazendas.some(function(f){
+      return f.nome.toLowerCase() === nome.toLowerCase();
+    });
+    if (existe){
+      alert("A fazenda \"" + nome + "\" já foi adicionada.");
+      return;
+    }
+
+    estado.fazendas.push({nome: nome, fn: fn, area: ""});
+    $("fzNova").value = "";
+    $("fzNova").style.display = "none";
+    sel.value = "";
+    popularSelect();
+    renderFazendas();
+    calcular();
+    salvar();
+  }
+  $("btnAddFazenda").addEventListener("click", adicionarFazenda);
+  $("fzNova").addEventListener("keydown", function(e){
+    if (e.key === "Enter"){ e.preventDefault(); adicionarFazenda(); }
+  });
+
+  $("btnCopiarSeq").addEventListener("click", function(){
+    var g = classificarSequencia();
+    var L = [];
+    L.push("SEQUÊNCIA DE APLICAÇÃO — " + (estado.campanha || "—"));
+    L.push("========================================");
+
+    function bloco(titulo, itens, modo){
+      if (!itens.length){ L.push(""); L.push(titulo + " (0)"); L.push("  —"); return; }
+      var soma = 0;
+      L.push("");
+      L.push(titulo + " (" + itens.length + ")");
+      itens.forEach(function(i, idx){
+        var v = modo === "concluida" ? i.aplicado : (modo === "andamento" ? i.saldo : i.area);
+        soma += v;
+        var marca = (modo === "aSeguir" && idx === 0) ? " <- PRÓXIMA" : "";
+        L.push("  S" + i.seq + " " + i.nome + " — " + fmt2.format(v) + " ha" +
+               (modo === "andamento" ? " a concluir" : "") + marca);
+      });
+      L.push("  Subtotal: " + fmt2.format(soma) + " ha");
+    }
+
+    bloco("CONCLUÍDAS", g.concluidas, "concluida");
+    bloco("EM ANDAMENTO", g.andamento, "andamento");
+    bloco("A SEGUIR", g.aSeguir, "aSeguir");
+
+    var totArea = 0, totAplic = 0;
+    CATALOGO_FAZENDAS.forEach(function(c){ totArea += c.area; totAplic += num(seqDe(c.nome).aplicado); });
+    L.push("");
+    L.push("TOTAL: " + fmt2.format(totAplic) + " ha de " + fmt2.format(totArea) + " ha (" +
+           (totArea > 0 ? (totAplic / totArea * 100).toFixed(1).replace(".", ",") : "0") + "%)");
+
+    var texto = L.join("\n");
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto).then(function(){
+        alert("Resumo da sequência copiado.");
+      }).catch(function(){ alert(texto); });
+    } else {
+      alert(texto);
+    }
+  });
+
+  $("btnImagemSeq").addEventListener("click", function(){
+    var btn = this;
+    btn.disabled = true;
+
+    // legenda que aparece só na imagem
+    var totArea = 0, totAplic = 0;
+    CATALOGO_FAZENDAS.forEach(function(c){ totArea += c.area; totAplic += num(seqDe(c.nome).aplicado); });
+    var pct = totArea > 0 ? (totAplic / totArea * 100) : 0;
+    var g = classificarSequencia();
+    $("seqLegenda").innerHTML =
+      '<div class="lg-tit">Sequência de aplicação — ' + (estado.campanha || "campanha") + '</div>' +
+      '<div class="lg-sub">' + dataBR(estado.data) + ' · ' +
+        fmt2.format(totAplic) + ' ha de ' + fmt2.format(totArea) + ' ha aplicados (' +
+        pct.toFixed(1).replace(".", ",") + '%) · ' +
+        g.concluidas.length + ' concluídas · ' + g.andamento.length + ' em andamento · ' +
+        g.aSeguir.length + ' a seguir</div>';
+
+    capturarElemento(document.getElementById("painelSequencia"), "cap-seq", "#ffffff").then(function(canvas){
+      baixarCanvas(canvas, "sequencia-fazendas-" + (estado.data || "hoje") + ".png");
+      $("seqLegenda").innerHTML = "";
+      btn.disabled = false;
+    }).catch(function(){
+      $("seqLegenda").innerHTML = "";
+      btn.disabled = false;
+      alert("Não foi possível gerar a imagem neste ambiente. Tente abrir o arquivo direto no navegador.");
+    });
+  });
+
+  $("seqBusca").addEventListener("input", function(){ renderSequencia(); });
+
+  $("btnPuxarHistorico").addEventListener("click", function(){
+    var mapa = aplicadoPorFazendaNoHistorico();
+    var nomes = Object.keys(mapa);
+    if (!nomes.length){
+      alert("Ainda não há áreas lançadas por fazenda no histórico.");
+      return;
+    }
+    var lista = nomes.map(function(n){ return "• " + n + ": " + fmt2.format(mapa[n]) + " ha"; }).join("\n");
+    if (!confirm("Preencher a coluna Aplicado com o que já foi lançado por fazenda?\n\n" + lista +
+                 "\n\nIsto substitui os valores digitados na tabela.")) return;
+    nomes.forEach(function(n){
+      var d = seqDe(n);
+      d.aplicado = fmt2.format(mapa[n]);
+    });
+    renderSequencia();
+    salvar();
+  });
+
+  $("btnAddObs").addEventListener("click", function(){
+    var t = $("obsTexto").value.trim();
+    if (!t) return;
+    estado.obs.push({texto: t});
+    $("obsTexto").value = "";
+    renderObs();
+    salvar();
+  });
+
+  $("obsTexto").addEventListener("keydown", function(e){
+    if (e.key === "Enter" && !e.shiftKey){
+      e.preventDefault();
+      $("btnAddObs").click();
+    }
+  });
+
+  $("btnAddEvento").addEventListener("click", function(){
+    var tipo = $("tipoEvento").value;
+    var hora = $("horaEvento").value;
+    if (!hora){
+      var agora = new Date();
+      hora = String(agora.getHours()).padStart(2, "0") + ":" +
+             String(agora.getMinutes()).padStart(2, "0");
+    }
+    var texto = $("textoEvento").value.trim();
+    estado.timeline.push({tipo: tipo, hora: hora, texto: texto});
+    $("textoEvento").value = "";
+    $("horaEvento").value = "";
+    renderTimeline();
+    salvar();
+  });
+
+  $("textoEvento").addEventListener("keydown", function(e){
+    if (e.key === "Enter"){
+      e.preventDefault();
+      $("btnAddEvento").click();
+    }
+  });
+
+  $("btnCopiarRelatorio").addEventListener("click", function(){
+    renderRelatorio();
+    var texto = $("relatorioTexto").value;
+    function ok(){
+      var av = $("avisoCopiado");
+      av.textContent = "✓ Relatório copiado";
+      setTimeout(function(){ av.textContent = ""; }, 2500);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto).then(ok).catch(function(){
+        $("relatorioTexto").select(); document.execCommand("copy"); ok();
+      });
+    } else {
+      $("relatorioTexto").select(); document.execCommand("copy"); ok();
+    }
+  });
+
+  function limparDadosDoDia(){
+    ["horaIni","horaFim","tempIni","tempFim","umidIni","umidFim","ventoIni","ventoFim","t70d","t70a"]
+      .forEach(function(k){ estado[k] = ""; });
+    estado.obs = [];
+    estado.timeline = [];
+    estado.fazendas = [];
+    var hoje = new Date();
+    estado.data = hoje.getFullYear() + "-" +
+      String(hoje.getMonth() + 1).padStart(2, "0") + "-" +
+      String(hoje.getDate()).padStart(2, "0");
+    aplicarEstadoNosCampos();
+    popularSelect();
+    renderFazendas();
+    renderObs();
+    renderTimeline();
+    calcular();
+  }
+
+  $("btnFecharDia").addEventListener("click", function(){
+    var totalDia = areaDoDia();
+    if (totalDia <= 0){
+      alert("Informe primeiro a área aplicada de T70 D e/ou T70 A antes de fechar o dia.");
+      return;
+    }
+    if (!confirm("Fechar o dia " + dataBR(estado.data) + " com " + fmt.format(totalDia) + " ha e salvar no histórico?\n\nOs dados do dia serão arquivados e a tela será preparada para um novo dia.")) return;
+
+    // snapshot completo do dia
+    var dia = {
+      data: estado.data,
+      campanha: estado.campanha,
+      horaIni: estado.horaIni, horaFim: estado.horaFim,
+      duracao: $("duracao").textContent,
+      haHora: $("haHora").textContent.replace(/\s+/g, " ").trim(),
+      tempIni: estado.tempIni, tempFim: estado.tempFim,
+      umidIni: estado.umidIni, umidFim: estado.umidFim,
+      ventoIni: estado.ventoIni, ventoFim: estado.ventoFim,
+      t70d: estado.t70d, t70a: estado.t70a,
+      totalDia: totalDia,
+      fazendas: estado.fazendas.map(function(f){ return {nome:f.nome, area:f.area}; }),
+      fazendasTexto: textoFazendas(),
+      obs: estado.obs.map(function(o){ return o.texto; }),
+      timeline: estado.timeline.slice(),
+      fechadoEm: new Date().toISOString()
+    };
+    estado.diasFechados.push(dia);
+
+    limparDadosDoDia();
+    salvar();
+    alert("Dia salvo no histórico. Acumulado da campanha: " + fmt.format(acumuladoCampanha()) + " ha.");
+  });
+
+  $("btnCopiarHistorico").addEventListener("click", function(){
+    var texto = textoHistorico();
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto).then(function(){
+        alert("Histórico copiado para a área de transferência.");
+      }).catch(function(){ alert(texto); });
+    } else {
+      alert(texto);
+    }
+  });
+
+  $("btnLimparHistorico").addEventListener("click", function(){
+    if (!estado.diasFechados.length){ alert("O histórico já está vazio."); return; }
+    if (!confirm("Apagar TODOS os " + estado.diasFechados.length + " dias do histórico e zerar o acumulado?\n\nEsta ação é irreversível. O total da campanha definido será mantido.")) return;
+    estado.diasFechados = [];
+    renderHistorico();
+    calcular();
+    salvar();
+  });
+
+  $("btnNovoDia").addEventListener("click", function(){
+    if (!confirm("Limpar os dados do dia atual (horários, clima, áreas, fazendas, observações e linha do tempo) SEM fechar/salvar no histórico?\n\nO total da campanha e os dias já fechados são mantidos.")) return;
+    limparDadosDoDia();
+    salvar();
+  });
+
+  /* ---------- Exportação: PDF e imagem ---------- */
+  var LIBS = {
+    html2canvas: "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+    jspdf:       "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+  };
+  function carregarLib(teste, url){
+    return new Promise(function(res, rej){
+      if (window[teste]) return res();
+      var s = document.createElement("script");
+      s.src = url; s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  function dataBR(iso){
+    if (!iso || iso.indexOf("-") === -1) return iso || "—";
+    var p = iso.split("-");
+    return p[2] + "/" + p[1] + "/" + p[0];
+  }
+
+  // A captura corta o texto de <input>; trocamos por texto puro durante a foto
+  function trocarCampos(raiz){
+    var trocados = [];
+    Array.prototype.forEach.call((raiz || document).querySelectorAll("input"), function(inp){
+      // campos escondidos no modo de captura não devem virar texto
+      var cs = getComputedStyle(inp);
+      if (cs.display === "none" || cs.visibility === "hidden") return;
+      var div = document.createElement("div");
+      var v = inp.value;
+      if (inp.type === "date" && v) v = dataBR(v);
+      div.textContent = v || "—";
+      div.style.fontFamily = cs.fontFamily;
+      div.style.fontSize = cs.fontSize;
+      div.style.fontWeight = cs.fontWeight;
+      div.style.color = v ? cs.color : "#b6c0cc";
+      div.style.lineHeight = "1.35";
+      div.style.padding = "2px 0";
+      div.style.textAlign = cs.textAlign;
+      div.style.whiteSpace = "normal";
+      div.style.wordBreak = "break-word";
+      inp.style.display = "none";
+      inp.parentNode.insertBefore(div, inp);
+      trocados.push({inp: inp, div: div});
+    });
+    return trocados;
+  }
+  function restaurarCampos(trocados){
+    trocados.forEach(function(t){
+      t.div.remove();
+      t.inp.style.display = "";
+    });
+  }
+
+  // captura genérica de um elemento; classeCap controla o que fica escondido
+  function capturarElemento(alvo, classeCap, fundo){
+    return carregarLib("html2canvas", LIBS.html2canvas).then(function(){
+      document.body.classList.add(classeCap);
+      var trocados = trocarCampos(alvo);
+
+      function limpar(){
+        restaurarCampos(trocados);
+        document.body.classList.remove(classeCap);
+      }
+
+      // aguarda o layout reflowar após esconder elementos e trocar campos
+      return new Promise(function(resolve){ requestAnimationFrame(function(){ requestAnimationFrame(resolve); }); })
+      .then(function(){
+        window.scrollTo(0, 0);
+        var largura = Math.max(alvo.offsetWidth, alvo.scrollWidth);
+        var altura  = Math.max(alvo.offsetHeight, alvo.scrollHeight);
+        // limita o tamanho do canvas: telas pequenas cortam capturas muito grandes
+        var escala = Math.min(2, 5000 / Math.max(largura, altura));
+        if (escala < 1) escala = 1;
+
+        return window.html2canvas(alvo, {
+          backgroundColor: fundo || "#f4f6fa",
+          scale: escala,
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: largura,
+          windowHeight: altura,
+          width: largura,
+          height: altura
+        });
+      }).then(function(canvas){ limpar(); return canvas; })
+        .catch(function(e){ limpar(); throw e; });
+    });
+  }
+
+  function capturarPainel(){
+    return capturarElemento(document.getElementById("capturaWrap"), "capturando", "#f4f6fa");
+  }
+
+  function baixarCanvas(canvas, nome){
+    var a = document.createElement("a");
+    a.download = nome;
+    a.href = canvas.toDataURL("image/png");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  $("btnExportImg").addEventListener("click", function(){
+    var btn = this;
+    btn.disabled = true;
+    capturarPainel().then(function(canvas){
+      var a = document.createElement("a");
+      a.download = "acompanhamento-diario-" + (estado.data || "hoje") + ".png";
+      a.href = canvas.toDataURL("image/png");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      btn.disabled = false;
+    }).catch(function(){
+      btn.disabled = false;
+      alert("Não foi possível gerar a imagem neste ambiente. Tente abrir o arquivo no navegador.");
+    });
+  });
+
+  $("btnExportPdf").addEventListener("click", function(){
+    var btn = this;
+    btn.disabled = true;
+    Promise.all([
+      capturarPainel(),
+      carregarLib("jspdf", LIBS.jspdf)
+    ]).then(function(res){
+      var canvas = res[0];
+      // PDF de página única, no tamanho exato do painel
+      var pdf = new window.jspdf.jsPDF({
+        orientation: canvas.width > canvas.height ? "l" : "p",
+        unit: "px",
+        format: [canvas.width, canvas.height],
+        hotfixes: ["px_scaling"]
+      });
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, canvas.width, canvas.height);
+      pdf.save("acompanhamento-diario-" + (estado.data || "hoje") + ".pdf");
+      btn.disabled = false;
+    }).catch(function(){
+      btn.disabled = false;
+      // alternativa: impressão do navegador
+      window.print();
+    });
+  });
+
+  carregar();
+})();
+</script>
+
+<script>
+/* Registro do service worker — habilita instalação e uso offline.
+   Só funciona quando o arquivo é servido por http(s) (ex.: hospedado
+   na web ou via GitHub Pages), não ao abrir com file://. */
+if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("./sw.js").catch(function(){ /* melhor-esforço */ });
+  });
+}
+</script>
+</body>
+</html>
